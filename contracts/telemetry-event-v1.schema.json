@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandok.dev/contracts/telemetry-event-v1.schema.json",
+  "title": "PANDOK Telemetry Event v1",
+  "oneOf": [
+    {"$ref": "#/$defs/sessionStarted"},
+    {"$ref": "#/$defs/runStarted"},
+    {"$ref": "#/$defs/upgradeOptionsShown"},
+    {"$ref": "#/$defs/upgradeSelected"},
+    {"$ref": "#/$defs/runCheckpoint"},
+    {"$ref": "#/$defs/runEnded"}
+  ],
+  "$defs": {
+    "commonBase": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "event_name",
+        "event_time",
+        "anonymous_user_id",
+        "session_id",
+        "game_version",
+        "schema_version"
+      ],
+      "properties": {
+        "event_id": {"type": "string", "format": "uuid"},
+        "event_name": {"type": "string"},
+        "event_time": {"type": "string", "format": "date-time", "pattern": "Z$"},
+        "anonymous_user_id": {"type": "string", "format": "uuid"},
+        "session_id": {"type": "string", "format": "uuid"},
+        "run_id": {"type": ["string", "null"], "format": "uuid"},
+        "game_version": {"type": "string", "minLength": 1},
+        "schema_version": {"const": "1.0"}
+      }
+    },
+    "stableId": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "nonNegativeNumber": {"type": "number", "minimum": 0},
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "positiveInteger": {"type": "integer", "minimum": 1},
+    "hpPercent": {"type": "number", "minimum": 0, "maximum": 100},
+    "upgradeOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "item_id", "rarity"],
+      "properties": {
+        "slot": {"type": "integer", "enum": [1, 2]},
+        "item_id": {"$ref": "#/$defs/stableId"},
+        "rarity": {"$ref": "#/$defs/stableId"},
+        "level_before": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "upgradeState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "upgrade_count"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/stableId"},
+        "upgrade_count": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "sessionStarted": {
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "properties": {
+            "event_name": {"const": "session_started"},
+            "run_id": {"type": "null"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runStarted": {
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": ["run_id"],
+          "properties": {
+            "event_name": {"const": "run_started"},
+            "run_id": {"type": "string", "format": "uuid"},
+            "map_id": {"$ref": "#/$defs/stableId"},
+            "starting_max_hp": {"type": "number", "exclusiveMinimum": 0},
+            "starting_weapon_id": {"$ref": "#/$defs/stableId"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "upgradeOptionsShown": {
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": [
+            "run_id",
+            "choice_id",
+            "choice_sequence",
+            "run_elapsed_seconds",
+            "options"
+          ],
+          "properties": {
+            "event_name": {"const": "upgrade_options_shown"},
+            "run_id": {"type": "string", "format": "uuid"},
+            "choice_id": {"type": "string", "format": "uuid"},
+            "choice_sequence": {"$ref": "#/$defs/positiveInteger"},
+            "run_elapsed_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
+            "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {"$ref": "#/$defs/upgradeOption"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "upgradeSelected": {
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": [
+            "run_id",
+            "choice_id",
+            "choice_sequence",
+            "run_elapsed_seconds",
+            "selected_slot",
+            "selected_item_id",
+            "selected_rarity"
+          ],
+          "properties": {
+            "event_name": {"const": "upgrade_selected"},
+            "run_id": {"type": "string", "format": "uuid"},
+            "choice_id": {"type": "string", "format": "uuid"},
+            "choice_sequence": {"$ref": "#/$defs/positiveInteger"},
+            "run_elapsed_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
+            "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "selected_slot": {"type": "integer", "enum": [1, 2]},
+            "selected_item_id": {"$ref": "#/$defs/stableId"},
+            "selected_rarity": {"$ref": "#/$defs/stableId"},
+            "item_level_before": {"$ref": "#/$defs/nonNegativeInteger"},
+            "item_level_after": {"$ref": "#/$defs/nonNegativeInteger"},
+            "effect_type": {"$ref": "#/$defs/stableId"},
+            "effect_delta": {"type": "number"},
+            "effect_value_after": {"type": "number"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runCheckpoint": {
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": ["run_id", "checkpoint_number", "run_elapsed_seconds"],
+          "properties": {
+            "event_name": {"const": "run_checkpoint"},
+            "run_id": {"type": "string", "format": "uuid"},
+            "checkpoint_number": {"$ref": "#/$defs/positiveInteger"},
+            "run_elapsed_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
+            "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "current_xp": {"$ref": "#/$defs/nonNegativeNumber"},
+            "xp_to_next_level": {"type": "number", "exclusiveMinimum": 0},
+            "hp_percent": {"$ref": "#/$defs/hpPercent"},
+            "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
+            "gold_earned": {"$ref": "#/$defs/nonNegativeNumber"},
+            "hearts_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_healing_received": {"$ref": "#/$defs/nonNegativeNumber"},
+            "magnets_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "miniboss_waves_cleared": {"$ref": "#/$defs/nonNegativeInteger"},
+            "active_upgrades": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/upgradeState"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runEnded": {
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": ["run_id", "end_reason", "run_duration_seconds"],
+          "properties": {
+            "event_name": {"const": "run_ended"},
+            "run_id": {"type": "string", "format": "uuid"},
+            "end_reason": {
+              "enum": [
+                "player_death",
+                "player_quit",
+                "run_completed",
+                "application_closed",
+                "unknown"
+              ]
+            },
+            "run_duration_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
+            "final_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
+            "gold_earned": {"$ref": "#/$defs/nonNegativeNumber"},
+            "hearts_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_healing_received": {"$ref": "#/$defs/nonNegativeNumber"},
+            "magnets_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "miniboss_waves_reached": {"$ref": "#/$defs/nonNegativeInteger"},
+            "miniboss_waves_cleared": {"$ref": "#/$defs/nonNegativeInteger"},
+            "final_upgrades": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/upgradeState"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

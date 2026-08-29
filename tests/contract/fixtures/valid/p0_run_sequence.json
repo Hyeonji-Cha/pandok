@@ -1,0 +1,104 @@
+[
+  {
+    "event_id": "00000000-0000-4000-8000-000000000001",
+    "event_name": "session_started",
+    "event_time": "2026-09-01T12:30:00Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": null,
+    "game_version": "1.2.0",
+    "schema_version": "1.0"
+  },
+  {
+    "event_id": "00000000-0000-4000-8000-000000000002",
+    "event_name": "run_started",
+    "event_time": "2026-09-01T12:30:10Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "starting_max_hp": 100
+  },
+  {
+    "event_id": "00000000-0000-4000-8000-000000000003",
+    "event_name": "upgrade_options_shown",
+    "event_time": "2026-09-01T12:31:10Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "choice_id": "40000000-0000-4000-8000-000000000001",
+    "choice_sequence": 1,
+    "run_elapsed_seconds": 60,
+    "player_level": 2,
+    "options": [
+      {"slot": 1, "item_id": "sword", "rarity": "common", "level_before": 0},
+      {"slot": 2, "item_id": "hourglass", "rarity": "uncommon", "level_before": 0}
+    ]
+  },
+  {
+    "event_id": "00000000-0000-4000-8000-000000000004",
+    "event_name": "upgrade_selected",
+    "event_time": "2026-09-01T12:31:12Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "choice_id": "40000000-0000-4000-8000-000000000001",
+    "choice_sequence": 1,
+    "run_elapsed_seconds": 60,
+    "player_level": 2,
+    "selected_slot": 2,
+    "selected_item_id": "hourglass",
+    "selected_rarity": "uncommon",
+    "item_level_before": 0,
+    "item_level_after": 1
+  },
+  {
+    "event_id": "00000000-0000-4000-8000-000000000005",
+    "event_name": "run_checkpoint",
+    "event_time": "2026-09-01T12:31:15Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "checkpoint_number": 1,
+    "run_elapsed_seconds": 60,
+    "player_level": 3,
+    "current_xp": 20,
+    "xp_to_next_level": 50,
+    "hp_percent": 72.5,
+    "total_kills": 48,
+    "total_xp_collected": 140,
+    "gold_earned": 12,
+    "miniboss_waves_cleared": 0,
+    "active_upgrades": [
+      {"item_id": "hourglass", "upgrade_count": 1}
+    ]
+  },
+  {
+    "event_id": "00000000-0000-4000-8000-000000000006",
+    "event_name": "run_ended",
+    "event_time": "2026-09-01T12:32:10Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "end_reason": "player_death",
+    "run_duration_seconds": 120,
+    "final_level": 4,
+    "total_kills": 75,
+    "total_xp_collected": 230,
+    "gold_earned": 21,
+    "miniboss_waves_reached": 1,
+    "miniboss_waves_cleared": 0,
+    "final_upgrades": [
+      {"item_id": "hourglass", "upgrade_count": 1}
+    ]
+  }
+]

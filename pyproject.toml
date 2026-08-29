@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pandok-contracts"
+version = "0.1.0"
+description = "Executable telemetry contracts for the PANDOK game analytics platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "jsonschema[format]>=4.23,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[project.scripts]
+pandok-contract = "pandok_contracts.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pandok_contracts"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
