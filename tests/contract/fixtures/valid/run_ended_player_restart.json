@@ -1,0 +1,15 @@
+{
+  "event_id": "00000000-0000-4000-8000-000000000014",
+  "event_name": "run_ended",
+  "event_time": "2026-09-01T12:32:10Z",
+  "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+  "session_id": "20000000-0000-4000-8000-000000000001",
+  "run_id": "30000000-0000-4000-8000-000000000001",
+  "game_version": "1.2.0",
+  "schema_version": "1.0",
+  "end_reason": "player_restart",
+  "run_duration_seconds": 120,
+  "final_level": 4,
+  "total_kills": 75,
+  "current_gold": 21
+}

@@ -9,5 +9,10 @@
   "schema_version": "1.0",
   "checkpoint_number": 1,
   "run_elapsed_seconds": 120,
+  "player_level": 3,
+  "current_xp": 20,
+  "xp_to_next_level": 50,
+  "total_kills": 48,
+  "current_gold": 12,
   "hp_percent": 101
 }

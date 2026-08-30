@@ -16,7 +16,7 @@ def test_valid_sequence_cli_returns_structured_success(capsys):
     )
     output = json.loads(capsys.readouterr().out)
     assert result == 0
-    assert output == {"valid": True, "event_count": 6, "issues": []}
+    assert output == {"valid": True, "event_count": 8, "issues": []}
 
 
 def test_invalid_event_cli_returns_structured_failure(capsys):

@@ -1,0 +1,18 @@
+{
+  "event_id": "90000000-0000-4000-8000-000000000001",
+  "event_name": "upgrade_options_shown",
+  "event_time": "2026-09-01T12:31:10Z",
+  "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+  "session_id": "20000000-0000-4000-8000-000000000001",
+  "run_id": "30000000-0000-4000-8000-000000000001",
+  "game_version": "1.2.0",
+  "schema_version": "1.0",
+  "choice_id": "40000000-0000-4000-8000-000000000009",
+  "choice_sequence": 9,
+  "choice_source": "statue",
+  "run_elapsed_seconds": 60,
+  "options": [
+    {"slot": 1, "item_id": "sword", "rarity": "common"},
+    {"slot": 2, "item_id": "hourglass", "rarity": "uncommon"}
+  ]
+}

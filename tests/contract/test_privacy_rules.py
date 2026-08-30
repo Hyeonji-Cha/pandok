@@ -17,7 +17,13 @@ def test_top_level_steam_id_is_rejected(valid_sequence):
 
 
 def test_nested_email_is_rejected(valid_sequence):
-    event = deepcopy(valid_sequence[2])
+    event = deepcopy(
+        next(
+            item
+            for item in valid_sequence
+            if item["event_name"] == "upgrade_options_shown"
+        )
+    )
     event["options"][0]["email"] = "player@example.com"
     issues = validate_event(event)
     assert issues[0].code == ReasonCode.PROHIBITED_FIELD
@@ -38,7 +44,13 @@ def test_nested_email_is_rejected(valid_sequence):
     ),
 )
 def test_every_documented_direct_identifier_is_rejected(valid_sequence, field):
-    event = deepcopy(valid_sequence[2])
+    event = deepcopy(
+        next(
+            item
+            for item in valid_sequence
+            if item["event_name"] == "upgrade_options_shown"
+        )
+    )
     event["options"][0][field] = "prohibited"
     issues = validate_event(event)
     assert issues[0].code == ReasonCode.PROHIBITED_FIELD

@@ -10,6 +10,43 @@
     "schema_version": "1.0"
   },
   {
+    "event_id": "00000000-0000-4000-8000-000000000007",
+    "event_name": "upgrade_options_shown",
+    "event_time": "2026-09-01T12:30:05Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "choice_id": "40000000-0000-4000-8000-000000000002",
+    "choice_sequence": 1,
+    "choice_source": "level_up_weapon",
+    "run_elapsed_seconds": 0,
+    "player_level": 1,
+    "options": [
+      {"slot": 1, "item_id": "starter_weapon_a", "rarity": "common"},
+      {"slot": 2, "item_id": "starter_weapon_b", "rarity": "common"}
+    ]
+  },
+  {
+    "event_id": "00000000-0000-4000-8000-000000000008",
+    "event_name": "upgrade_selected",
+    "event_time": "2026-09-01T12:30:06Z",
+    "anonymous_user_id": "10000000-0000-4000-8000-000000000001",
+    "session_id": "20000000-0000-4000-8000-000000000001",
+    "run_id": "30000000-0000-4000-8000-000000000001",
+    "game_version": "1.2.0",
+    "schema_version": "1.0",
+    "choice_id": "40000000-0000-4000-8000-000000000002",
+    "choice_sequence": 1,
+    "choice_source": "level_up_weapon",
+    "run_elapsed_seconds": 0,
+    "player_level": 1,
+    "selected_slot": 1,
+    "selected_item_id": "starter_weapon_a",
+    "selected_rarity": "common"
+  },
+  {
     "event_id": "00000000-0000-4000-8000-000000000002",
     "event_name": "run_started",
     "event_time": "2026-09-01T12:30:10Z",
@@ -18,7 +55,8 @@
     "run_id": "30000000-0000-4000-8000-000000000001",
     "game_version": "1.2.0",
     "schema_version": "1.0",
-    "starting_max_hp": 100
+    "starting_max_hp": 100,
+    "starting_weapon_id": "starter_weapon_a"
   },
   {
     "event_id": "00000000-0000-4000-8000-000000000003",
@@ -30,12 +68,14 @@
     "game_version": "1.2.0",
     "schema_version": "1.0",
     "choice_id": "40000000-0000-4000-8000-000000000001",
-    "choice_sequence": 1,
+    "choice_sequence": 2,
+    "choice_source": "statue",
     "run_elapsed_seconds": 60,
     "player_level": 2,
     "options": [
-      {"slot": 1, "item_id": "sword", "rarity": "common", "level_before": 0},
-      {"slot": 2, "item_id": "hourglass", "rarity": "uncommon", "level_before": 0}
+      {"slot": 1, "item_id": "sword", "rarity": "common"},
+      {"slot": 2, "item_id": "hourglass", "rarity": "uncommon"},
+      {"slot": 3, "item_id": "gold_ingot", "rarity": "rare"}
     ]
   },
   {
@@ -48,14 +88,13 @@
     "game_version": "1.2.0",
     "schema_version": "1.0",
     "choice_id": "40000000-0000-4000-8000-000000000001",
-    "choice_sequence": 1,
+    "choice_sequence": 2,
+    "choice_source": "statue",
     "run_elapsed_seconds": 60,
     "player_level": 2,
     "selected_slot": 2,
     "selected_item_id": "hourglass",
-    "selected_rarity": "uncommon",
-    "item_level_before": 0,
-    "item_level_after": 1
+    "selected_rarity": "uncommon"
   },
   {
     "event_id": "00000000-0000-4000-8000-000000000005",
@@ -73,12 +112,7 @@
     "xp_to_next_level": 50,
     "hp_percent": 72.5,
     "total_kills": 48,
-    "total_xp_collected": 140,
-    "gold_earned": 12,
-    "miniboss_waves_cleared": 0,
-    "active_upgrades": [
-      {"item_id": "hourglass", "upgrade_count": 1}
-    ]
+    "current_gold": 12
   },
   {
     "event_id": "00000000-0000-4000-8000-000000000006",
@@ -93,12 +127,6 @@
     "run_duration_seconds": 120,
     "final_level": 4,
     "total_kills": 75,
-    "total_xp_collected": 230,
-    "gold_earned": 21,
-    "miniboss_waves_reached": 1,
-    "miniboss_waves_cleared": 0,
-    "final_upgrades": [
-      {"item_id": "hourglass", "upgrade_count": 1}
-    ]
+    "current_gold": 21
   }
 ]
