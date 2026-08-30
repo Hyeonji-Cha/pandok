@@ -38,24 +38,47 @@
     "nonNegativeInteger": {"type": "integer", "minimum": 0},
     "positiveInteger": {"type": "integer", "minimum": 1},
     "hpPercent": {"type": "number", "minimum": 0, "maximum": 100},
+    "choiceSource": {
+      "enum": ["level_up_weapon", "level_up_upgrade", "statue"]
+    },
+    "rarity": {
+      "enum": ["common", "uncommon", "rare", "epic", "legendary"]
+    },
+    "chestItemId": {
+      "enum": [
+        "horseshoe",
+        "gold_ingot",
+        "hourglass",
+        "sword",
+        "bull_skull",
+        "sticky_bone",
+        "greyhound_tooth",
+        "blood_scent"
+      ]
+    },
+    "effectValue": {"type": ["number", "boolean"]},
     "upgradeOption": {
       "type": "object",
       "additionalProperties": false,
       "required": ["slot", "item_id", "rarity"],
       "properties": {
-        "slot": {"type": "integer", "enum": [1, 2]},
+        "slot": {"type": "integer", "enum": [1, 2, 3]},
         "item_id": {"$ref": "#/$defs/stableId"},
-        "rarity": {"$ref": "#/$defs/stableId"},
-        "level_before": {"$ref": "#/$defs/nonNegativeInteger"}
+        "rarity": {"$ref": "#/$defs/rarity"},
+        "acquisition_count_before": {"$ref": "#/$defs/nonNegativeInteger"},
+        "effect_type": {"$ref": "#/$defs/stableId"},
+        "effect_value_before": {"$ref": "#/$defs/effectValue"}
       }
     },
     "upgradeState": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["item_id", "upgrade_count"],
+      "required": ["item_id", "acquisition_count"],
       "properties": {
         "item_id": {"$ref": "#/$defs/stableId"},
-        "upgrade_count": {"$ref": "#/$defs/positiveInteger"}
+        "acquisition_count": {"$ref": "#/$defs/positiveInteger"},
+        "effect_type": {"$ref": "#/$defs/stableId"},
+        "effect_value": {"$ref": "#/$defs/effectValue"}
       }
     },
     "sessionStarted": {
@@ -97,6 +120,7 @@
             "run_id",
             "choice_id",
             "choice_sequence",
+            "choice_source",
             "run_elapsed_seconds",
             "options"
           ],
@@ -105,15 +129,54 @@
             "run_id": {"type": "string", "format": "uuid"},
             "choice_id": {"type": "string", "format": "uuid"},
             "choice_sequence": {"$ref": "#/$defs/positiveInteger"},
+            "choice_source": {"$ref": "#/$defs/choiceSource"},
             "run_elapsed_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
             "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
             "options": {
               "type": "array",
               "minItems": 2,
-              "maxItems": 2,
+              "maxItems": 3,
               "items": {"$ref": "#/$defs/upgradeOption"}
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"choice_source": {"const": "statue"}},
+                "required": ["choice_source"]
+              },
+              "then": {
+                "properties": {
+                  "options": {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": {
+                      "properties": {
+                        "item_id": {"$ref": "#/$defs/chestItemId"}
+                      }
+                    },
+                    "allOf": [
+                      {"contains": {"properties": {"slot": {"const": 1}}}, "minContains": 1, "maxContains": 1},
+                      {"contains": {"properties": {"slot": {"const": 2}}}, "minContains": 1, "maxContains": 1},
+                      {"contains": {"properties": {"slot": {"const": 3}}}, "minContains": 1, "maxContains": 1}
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "options": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "allOf": [
+                      {"contains": {"properties": {"slot": {"const": 1}}}, "minContains": 1, "maxContains": 1},
+                      {"contains": {"properties": {"slot": {"const": 2}}}, "minContains": 1, "maxContains": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          ]
         }
       ],
       "unevaluatedProperties": false
@@ -127,6 +190,7 @@
             "run_id",
             "choice_id",
             "choice_sequence",
+            "choice_source",
             "run_elapsed_seconds",
             "selected_slot",
             "selected_item_id",
@@ -137,17 +201,35 @@
             "run_id": {"type": "string", "format": "uuid"},
             "choice_id": {"type": "string", "format": "uuid"},
             "choice_sequence": {"$ref": "#/$defs/positiveInteger"},
+            "choice_source": {"$ref": "#/$defs/choiceSource"},
             "run_elapsed_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
             "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
-            "selected_slot": {"type": "integer", "enum": [1, 2]},
+            "selected_slot": {"type": "integer", "enum": [1, 2, 3]},
             "selected_item_id": {"$ref": "#/$defs/stableId"},
-            "selected_rarity": {"$ref": "#/$defs/stableId"},
-            "item_level_before": {"$ref": "#/$defs/nonNegativeInteger"},
-            "item_level_after": {"$ref": "#/$defs/nonNegativeInteger"},
+            "selected_rarity": {"$ref": "#/$defs/rarity"},
+            "acquisition_count_before": {"$ref": "#/$defs/nonNegativeInteger"},
+            "acquisition_count_after": {"$ref": "#/$defs/positiveInteger"},
             "effect_type": {"$ref": "#/$defs/stableId"},
-            "effect_delta": {"type": "number"},
-            "effect_value_after": {"type": "number"}
-          }
+            "effect_value_before": {"$ref": "#/$defs/effectValue"},
+            "effect_value_after": {"$ref": "#/$defs/effectValue"}
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"choice_source": {"const": "statue"}},
+                "required": ["choice_source"]
+              },
+              "then": {
+                "properties": {
+                  "selected_slot": {"enum": [1, 2, 3]},
+                  "selected_item_id": {"$ref": "#/$defs/chestItemId"}
+                }
+              },
+              "else": {
+                "properties": {"selected_slot": {"enum": [1, 2]}}
+              }
+            }
+          ]
         }
       ],
       "unevaluatedProperties": false
@@ -157,7 +239,17 @@
         {"$ref": "#/$defs/commonBase"},
         {
           "type": "object",
-          "required": ["run_id", "checkpoint_number", "run_elapsed_seconds"],
+          "required": [
+            "run_id",
+            "checkpoint_number",
+            "run_elapsed_seconds",
+            "player_level",
+            "current_xp",
+            "xp_to_next_level",
+            "hp_percent",
+            "total_kills",
+            "current_gold"
+          ],
           "properties": {
             "event_name": {"const": "run_checkpoint"},
             "run_id": {"type": "string", "format": "uuid"},
@@ -169,7 +261,8 @@
             "hp_percent": {"$ref": "#/$defs/hpPercent"},
             "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
-            "gold_earned": {"$ref": "#/$defs/nonNegativeNumber"},
+            "current_gold": {"$ref": "#/$defs/nonNegativeNumber"},
+            "total_gold_collected": {"$ref": "#/$defs/nonNegativeNumber"},
             "hearts_collected": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_healing_received": {"$ref": "#/$defs/nonNegativeNumber"},
             "magnets_collected": {"$ref": "#/$defs/nonNegativeInteger"},
@@ -188,7 +281,14 @@
         {"$ref": "#/$defs/commonBase"},
         {
           "type": "object",
-          "required": ["run_id", "end_reason", "run_duration_seconds"],
+          "required": [
+            "run_id",
+            "end_reason",
+            "run_duration_seconds",
+            "final_level",
+            "total_kills",
+            "current_gold"
+          ],
           "properties": {
             "event_name": {"const": "run_ended"},
             "run_id": {"type": "string", "format": "uuid"},
@@ -196,6 +296,7 @@
               "enum": [
                 "player_death",
                 "player_quit",
+                "player_restart",
                 "run_completed",
                 "application_closed",
                 "unknown"
@@ -205,7 +306,8 @@
             "final_level": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
-            "gold_earned": {"$ref": "#/$defs/nonNegativeNumber"},
+            "current_gold": {"$ref": "#/$defs/nonNegativeNumber"},
+            "total_gold_collected": {"$ref": "#/$defs/nonNegativeNumber"},
             "hearts_collected": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_healing_received": {"$ref": "#/$defs/nonNegativeNumber"},
             "magnets_collected": {"$ref": "#/$defs/nonNegativeInteger"},
