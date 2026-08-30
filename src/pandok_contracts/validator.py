@@ -49,20 +49,47 @@ _MONOTONIC_FIELDS = (
     "run_elapsed_seconds",
     "total_kills",
     "total_xp_collected",
-    "gold_earned",
+    "total_gold_collected",
     "hearts_collected",
     "total_healing_received",
     "magnets_collected",
     "miniboss_waves_cleared",
 )
 
+_EVENT_DEFS = {
+    "session_started": "sessionStarted",
+    "run_started": "runStarted",
+    "upgrade_options_shown": "upgradeOptionsShown",
+    "upgrade_selected": "upgradeSelected",
+    "run_checkpoint": "runCheckpoint",
+    "run_ended": "runEnded",
+}
+
 
 @lru_cache(maxsize=1)
-def _validator() -> Draft202012Validator:
+def _schema() -> dict[str, Any]:
     with SCHEMA_PATH.open(encoding="utf-8") as handle:
         schema = json.load(handle)
     Draft202012Validator.check_schema(schema)
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    return schema
+
+
+@lru_cache(maxsize=len(_EVENT_DEFS) + 1)
+def _validator(event_name: str | None = None) -> Draft202012Validator:
+    schema = _schema()
+    definition = _EVENT_DEFS.get(event_name or "")
+    if definition is None:
+        validation_schema = schema
+    else:
+        validation_schema = {
+            "$schema": schema["$schema"],
+            "$defs": schema["$defs"],
+            "$ref": f"#/$defs/{definition}",
+        }
+    return Draft202012Validator(
+        validation_schema,
+        format_checker=FormatChecker(),
+    )
 
 
 def _normalize_key(key: str) -> str:
@@ -110,11 +137,12 @@ def validate_event(event: Any) -> list[ValidationIssue]:
     if privacy:
         return privacy
 
+    event_name = event.get("event_name")
     errors = sorted(
-        _validator().iter_errors(event),
+        _validator(event_name if isinstance(event_name, str) else None).iter_errors(event),
         key=lambda error: tuple(str(part) for part in error.absolute_path),
     )
-    return [
+    schema_issues = [
         ValidationIssue(
             ReasonCode.SCHEMA_INVALID,
             error.message,
@@ -123,6 +151,31 @@ def validate_event(event: Any) -> list[ValidationIssue]:
         )
         for error in errors
     ]
+    if schema_issues:
+        return schema_issues
+
+    if (
+        event_name == "upgrade_options_shown"
+        and event.get("choice_source") == "statue"
+    ):
+        options = event.get("options")
+        if isinstance(options, list):
+            item_ids = [
+                option.get("item_id")
+                for option in options
+                if isinstance(option, Mapping)
+            ]
+            if len(item_ids) != len(set(item_ids)):
+                return [
+                    ValidationIssue(
+                        ReasonCode.CHOICE_MISMATCH,
+                        "Statue options must use distinct item_id values",
+                        ("options",),
+                        event_id,
+                    )
+                ]
+
+    return []
 
 
 def _canonical(event: Mapping[str, Any]) -> str:
@@ -214,17 +267,43 @@ def validate_sequence(events: Any) -> list[ValidationIssue]:
                     )
                 )
 
-    if run_events[0]["event_name"] != "run_started":
-        issues.append(
-            _issue(
-                ReasonCode.EVENT_ORDER_INVALID,
-                "run_started must be the earliest event in the Run",
-                run_events[0],
-                "event_time",
-            )
+    start_time = _event_time(start)
+    for event in run_events:
+        if _event_time(event) >= start_time:
+            continue
+        is_initial_weapon_choice = (
+            event["event_name"] in {"upgrade_options_shown", "upgrade_selected"}
+            and event.get("choice_source") == "level_up_weapon"
+            and event.get("run_elapsed_seconds") == 0
         )
+        if not is_initial_weapon_choice:
+            issues.append(
+                _issue(
+                    ReasonCode.EVENT_ORDER_INVALID,
+                    "Only a zero-time initial level_up_weapon choice may precede run_started",
+                    event,
+                    "event_time",
+                )
+            )
 
     shown_choices: dict[str, Mapping[str, Any]] = {}
+    for event in run_events:
+        if event["event_name"] != "upgrade_options_shown":
+            continue
+        choice_id = str(event["choice_id"])
+        prior = shown_choices.get(choice_id)
+        if prior is not None and _canonical(prior) != _canonical(event):
+            issues.append(
+                _issue(
+                    ReasonCode.CHOICE_MISMATCH,
+                    "The same choice_id identifies different shown choices",
+                    event,
+                    "choice_id",
+                )
+            )
+            continue
+        shown_choices[choice_id] = event
+
     previous_values: dict[str, float] = {}
     previous_checkpoint = 0
     previous_choice_sequence = 0
@@ -255,17 +334,18 @@ def validate_sequence(events: Any) -> list[ValidationIssue]:
                 )
             previous_choice_sequence = choice_sequence
             slots = [option["slot"] for option in event["options"]]
-            if set(slots) != {1, 2}:
+            expected_slots = (
+                {1, 2, 3} if event["choice_source"] == "statue" else {1, 2}
+            )
+            if set(slots) != expected_slots or len(slots) != len(expected_slots):
                 issues.append(
                     _issue(
                         ReasonCode.CHOICE_MISMATCH,
-                        "Upgrade options must use slots 1 and 2 exactly once",
+                        "Upgrade options do not match the source-specific slot set",
                         event,
                         "options",
                     )
                 )
-            shown_choices[str(event["choice_id"])] = event
-
         if name == "upgrade_selected":
             shown = shown_choices.get(str(event["choice_id"]))
             if shown is None:
@@ -278,6 +358,15 @@ def validate_sequence(events: Any) -> list[ValidationIssue]:
                     )
                 )
             else:
+                if _event_time(shown) > _event_time(event):
+                    issues.append(
+                        _issue(
+                            ReasonCode.EVENT_ORDER_INVALID,
+                            "upgrade_selected occurs before its upgrade_options_shown",
+                            event,
+                            "event_time",
+                        )
+                    )
                 expected = {
                     (
                         option["slot"],
@@ -294,6 +383,7 @@ def validate_sequence(events: Any) -> list[ValidationIssue]:
                 if (
                     actual not in expected
                     or event["choice_sequence"] != shown["choice_sequence"]
+                    or event["choice_source"] != shown["choice_source"]
                 ):
                     issues.append(
                         _issue(
