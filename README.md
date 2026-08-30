@@ -15,8 +15,8 @@ Supported events:
 | Event | Required `run_id` | Purpose |
 |---|---:|---|
 | `session_started` | No | Start a consented application session |
-| `run_started` | Yes | Start active gameplay for one Run |
-| `upgrade_options_shown` | Yes | Record the two displayed upgrade choices |
+| `run_started` | Yes | Start active gameplay after initial weapon selection |
+| `upgrade_options_shown` | Yes | Record source-specific displayed upgrade choices |
 | `upgrade_selected` | Yes | Record the linked player selection |
 | `run_checkpoint` | Yes | Record cumulative state every 60 active seconds |
 | `run_ended` | Yes | Record the final available Run summary |
@@ -24,9 +24,20 @@ Supported events:
 Every event contains `event_id`, `event_name`, `event_time`, `anonymous_user_id`, `session_id`,
 `game_version`, and `schema_version`. Run events also contain `run_id`. Retries preserve `event_id`.
 
-Fields dependent on unconfirmed game-code access remain optional in contract v1, but their values are
-validated whenever present. See the [feature specification](specs/001-run-telemetry-contract/spec.md)
-for confirmed scope and developer-pending decisions.
+Choice events require `choice_source`. `level_up_weapon` and `level_up_upgrade` use slots 1 and 2;
+`statue` uses slots 1 through 3 and confirmed `ChestItemType` identifiers. The selected source, slot,
+item, and rarity must match the linked shown event. Initial weapon choice events may use an allocated
+`run_id` at zero elapsed time before `run_started`, which marks the resumption of active gameplay.
+
+Unity currently exposes player level, current XP, next-level XP, HP, cumulative kills, and current
+gold. Total acquired XP/gold, per-item `acquisition_count`, full active-upgrade state, effect values,
+and miniboss progress remain optional and marked `implementation required` until the game supplies
+Run counters or a Snapshot API. See the
+[feature specification](specs/001-run-telemetry-contract/spec.md) for the exact boundary.
+
+The contract remains an externally unused Draft, so the Unity-source corrections are applied within
+schema version `1.0`. Automatic chest rewards (`upgrade_granted`) and miniboss/boss-wave telemetry are
+P1 designs and are not accepted as P0 event names.
 
 ## Privacy Boundary
 
@@ -79,7 +90,7 @@ python -m pytest
 Successful CLI validation returns exit code `0` and JSON similar to:
 
 ```json
-{"valid": true, "event_count": 6, "issues": []}
+{"valid": true, "event_count": 8, "issues": []}
 ```
 
 Rejected input returns exit code `1`, `valid: false`, and one or more issues with a stable `code`,
@@ -111,12 +122,17 @@ The next infrastructure features will be specified separately after this contrac
 
 ## Verified Results
 
-Verified on 2026-08-29 with Python 3.12:
+Verified on 2026-08-30 in the available Python 3.11 compatibility environment; the project target
+remains Python 3.12:
 
 - JSON Schema Draft 2020-12 self-validation: passed
-- Automated contract suite: 48 passed
+- Automated contract suite: 85 passed
 - Valid single-event CLI example: passed
-- Valid six-event P0 Run sequence: passed
+- Valid eight-record P0 Run sequence covering all six event types: passed
+- Two-option level-up and three-option statue conditional validation: passed
+- Three distinct statue item identifiers and duplicate-item rejection: passed
+- Pre-Run initial weapon choice and linked source validation: passed
+- Same-time shown/selected links are independent of network arrival order: passed
 - Prohibited `steam_id` fixture: rejected with `prohibited_field`
 - 10,000 single-event validations: completed below the 10-second acceptance threshold
 - Python bytecode compilation and Git whitespace checks: passed
