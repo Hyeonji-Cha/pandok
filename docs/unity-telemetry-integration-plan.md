@@ -33,7 +33,7 @@ Run all commands from the repository root.
 | Valid eight-event Run example | `tests/contract/fixtures/valid/p0_run_sequence.json` |
 | Invalid examples | `tests/contract/fixtures/invalid/` |
 | Contract tests | `tests/contract/` |
-| Behavioral contract reference | `specs/001-run-telemetry-contract/contracts/telemetry-events-v1.md` |
+| Behavioral contract reference | `docs/event-contract.md` |
 
 The executable JSON Schema is the source of truth for individual event shape and field constraints.
 The Python validator is the source of truth for privacy, event relationships, ordering, retries, and
@@ -297,4 +297,4 @@ The contract remains Draft until the consent and queue-purge runtime evidence is
 - [Python validator](../src/pandok_contracts/validator.py)
 - [Valid P0 Run example](../tests/contract/fixtures/valid/p0_run_sequence.json)
 - [Invalid examples](../tests/contract/fixtures/invalid/)
-- [Behavioral contract reference](../specs/001-run-telemetry-contract/contracts/telemetry-events-v1.md)
+- [Behavioral contract reference](event-contract.md)
