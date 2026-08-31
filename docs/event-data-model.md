@@ -9,6 +9,7 @@ All P0 events contain these fields.
 | `event_id` | Logical event identity, preserved across retries | UUID, required |
 | `event_name` | P0 event category | One of six supported values, required |
 | `event_time` | Time the gameplay fact occurred | UTC ISO 8601 date-time, required |
+| `source_type` | Production play, controlled validation, or load testing | One of three supported values, required and consistent within a Run |
 | `anonymous_user_id` | Random installation identity created after consent | UUID, required |
 | `session_id` | One application-session identity | UUID, required |
 | `run_id` | One gameplay-attempt identity | UUID for Run events; optional for session start |

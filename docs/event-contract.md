@@ -1,8 +1,7 @@
 # Telemetry Events v1 Interface Contract
 
 This document is the active behavioral reference for the executable schema in
-`contracts/telemetry-event-v1.schema.json`. The current v1 draft predates the required
-`source_type` field; production ingestion cannot be accepted until that field and its tests are added.
+`contracts/telemetry-event-v1.schema.json`. The current v1 draft requires `source_type` on every event.
 
 ## Boundary
 
@@ -33,6 +32,19 @@ explains behavioral rules that require more than single-document schema validati
 - A shown choice and its selection may share the same `event_time`; `choice_id` links them independently
   of arrival order. A selection with an earlier `event_time` than its shown choice is invalid.
 - A missing `run_ended` or `session_ended` does not prove the player is still active.
+
+## Source Classification
+
+- `CONSENTED_PROD_PLAY` represents natural play by a consenting Steam user and may enter product analytics
+  and Bedrock inputs.
+- `CONTROLLED_SCENARIO` represents reproducible functional or correctness tests and is excluded from product
+  analytics and Bedrock inputs.
+- `LOAD_TEST` represents throughput, backpressure, or recovery tests and is excluded from product analytics
+  and Bedrock inputs.
+- Every event requires `source_type`, and all events in one Run must use the same value.
+- Reusing an `event_id` with a different `source_type` is a payload conflict.
+- The ingestion path must verify that the producer and collection channel are authorized to use the supplied
+  value.
 
 ## Upgrade Choice Rules
 

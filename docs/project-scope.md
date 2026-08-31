@@ -27,8 +27,9 @@ trusted Run analytics, and provide traceable improvement evidence to the game de
 | `CONTROLLED_SCENARIO` | Reproducible functional and edge-case tests | Excluded |
 | `LOAD_TEST` | Throughput, backpressure, and recovery tests | Excluded |
 
-`source_type` is a required target field but is not yet present in the executable v1 draft contract. It must be
-added and tested before AWS ingestion is treated as complete.
+`source_type` is required by the executable v1 draft contract. Events in one Run must use the same value, and
+the same `event_id` cannot be reused with a different source. Collection channels must later verify that the
+producer is authorized to use the supplied value.
 
 ## Out of scope
 

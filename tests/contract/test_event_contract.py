@@ -106,6 +106,21 @@ def test_unsupported_schema_version_is_rejected(valid_sequence):
     assert issues and issues[0].code == ReasonCode.SCHEMA_INVALID
 
 
+@pytest.mark.parametrize(
+    "source_type",
+    [
+        "CONSENTED_PROD_PLAY",
+        "CONTROLLED_SCENARIO",
+        "LOAD_TEST",
+    ],
+)
+# 세 가지 source_type 허용값이 단일 이벤트 검증을 통과하는지 확인한다.
+def test_supported_source_types_are_accepted(valid_sequence, source_type):
+    event = deepcopy(valid_sequence[1])
+    event["source_type"] = source_type
+    assert validate_event(event) == []
+
+
 def test_unknown_field_is_rejected(valid_sequence):
     event = deepcopy(valid_sequence[1])
     event["unreviewed_field"] = "surprise"
@@ -180,6 +195,7 @@ REQUIRED_FIELDS = {
         "event_id",
         "event_name",
         "event_time",
+        "source_type",
         "anonymous_user_id",
         "session_id",
         "game_version",
@@ -207,6 +223,7 @@ def test_every_event_specific_required_field_is_enforced(valid_sequence):
         ("event_time", "2026-09-01 12:30:10"),
         ("event_id", "not-a-uuid"),
         ("event_name", "enemy_killed"),
+        ("source_type", "UNKNOWN_SOURCE"),
         ("schema_version", "99.0"),
     ],
 )

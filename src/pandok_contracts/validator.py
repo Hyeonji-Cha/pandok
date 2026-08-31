@@ -37,12 +37,14 @@ _PROHIBITED_KEYS = {
     "ipaddress",
 }
 
+# 같은 Run의 모든 이벤트에서 동일해야 하는 식별·출처 필드
 _CORRELATION_FIELDS = (
     "anonymous_user_id",
     "session_id",
     "run_id",
     "game_version",
     "schema_version",
+    "source_type",
 )
 
 _MONOTONIC_FIELDS = (
@@ -66,6 +68,7 @@ _EVENT_DEFS = {
 }
 
 
+# JSON Schema를 한 번만 읽고 재사용한다.
 @lru_cache(maxsize=1)
 def _schema() -> dict[str, Any]:
     with SCHEMA_PATH.open(encoding="utf-8") as handle:
@@ -74,6 +77,7 @@ def _schema() -> dict[str, Any]:
     return schema
 
 
+# 이벤트 종류에 맞는 JSON Schema 검증기를 생성하고 캐시한다.
 @lru_cache(maxsize=len(_EVENT_DEFS) + 1)
 def _validator(event_name: str | None = None) -> Draft202012Validator:
     schema = _schema()
@@ -92,10 +96,12 @@ def _validator(event_name: str | None = None) -> Draft202012Validator:
     )
 
 
+# 개인정보 필드 비교를 위해 키의 대소문자와 구분 문자를 제거한다.
 def _normalize_key(key: str) -> str:
     return re.sub(r"[^a-z0-9]", "", key.casefold())
 
 
+# 중첩된 객체와 배열까지 탐색해 금지된 개인정보 필드를 찾는다.
 def _privacy_issues(
     value: Any,
     path: tuple[str | int, ...] = (),
@@ -121,6 +127,7 @@ def _privacy_issues(
     return issues
 
 
+# 단일 이벤트의 개인정보, Schema, 선택지 규칙을 검증한다.
 def validate_event(event: Any) -> list[ValidationIssue]:
     """Return all contract issues for one event; an empty list means valid."""
 
@@ -178,14 +185,17 @@ def validate_event(event: Any) -> list[ValidationIssue]:
     return []
 
 
+# 이벤트 내용을 일정한 문자열로 바꿔 재시도와 충돌을 비교한다.
 def _canonical(event: Mapping[str, Any]) -> str:
     return json.dumps(event, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+# UTC 이벤트 시각 문자열을 정렬 가능한 datetime으로 변환한다.
 def _event_time(event: Mapping[str, Any]) -> datetime:
     return datetime.fromisoformat(str(event["event_time"]).replace("Z", "+00:00"))
 
 
+# 이벤트 정보와 필드 경로를 포함한 표준 검증 오류를 만든다.
 def _issue(
     code: ReasonCode,
     message: str,
@@ -201,6 +211,7 @@ def _issue(
     )
 
 
+# 동일 event_id의 재시도는 합치고 내용이 다르면 충돌로 기록한다.
 def _deduplicate(
     events: Sequence[Mapping[str, Any]],
 ) -> tuple[list[Mapping[str, Any]], list[ValidationIssue]]:
@@ -225,6 +236,7 @@ def _deduplicate(
     return unique, issues
 
 
+# 이벤트 순서와 Run 전체의 상관관계·누적 상태를 검증한다.
 def validate_sequence(events: Any) -> list[ValidationIssue]:
     """Validate a P0 sequence independent of network arrival order."""
 
