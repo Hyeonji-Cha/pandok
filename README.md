@@ -47,8 +47,9 @@ Telemetry must remain disabled until explicit consent. Revocation stops new even
 local queue. Steam ID, nickname, email, device identifier, authentication token, chat content, precise
 location, username, and free-form user text are prohibited.
 
-Production, controlled-scenario, and load-test data must be separated by `source_type` before AWS ingestion
-is implemented. Adding and testing this required field is the next contract change.
+Every event requires `source_type` so production, controlled-scenario, and load-test data remain separated.
+All events in one Run must use the same value. Product analytics and Bedrock inputs include only
+`CONSENTED_PROD_PLAY`.
 
 ## Local setup
 
@@ -96,7 +97,7 @@ scope and decision -> small implementation unit -> automated test -> execution e
 The repository records the following baseline from 2026-08-30/31:
 
 - JSON Schema Draft 2020-12 self-validation passed.
-- Automated contract suite: 85 passed.
+- Automated contract suite: 92 passed.
 - Valid eight-record P0 Run sequence accepted.
 - Prohibited `steam_id` rejected with `prohibited_field`.
 - 10,000 single-event validations completed below the 10-second acceptance threshold.

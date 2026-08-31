@@ -66,6 +66,7 @@ No other Run event may occur before `run_started`.
 | `event_id` | UUID used for retry and deduplication | Required |
 | `event_name` | Event type | Required |
 | `event_time` | UTC event occurrence time | Required |
+| `source_type` | Event source classification | Required; must match the approved producer and collection scenario |
 | `anonymous_user_id` | Anonymous UUID with no direct identifier | Required; Unity creation and lifetime mapping pending |
 | `session_id` | Application-session UUID | Required; Unity lifecycle mapping pending |
 | `run_id` | UUID connecting one Run | Required for Run events |
@@ -138,6 +139,11 @@ The original numbers are retained for traceability. For each question, answer `S
 | 9 | Can the Run-end path reliably distinguish `player_death` from `player_restart`? |  |  |
 | 10 | Can Unity guarantee that no event is created or queued before explicit consent? |  |  |
 | 13 | Are any contract fields unavailable or semantically different in the current Unity implementation? |  |  |
+| 14 | When is the anonymous UUID created after consent, does it persist across game restarts, and is it reused after revocation and renewed consent? |  |  |
+
+Keep the current `anonymous_user_id` field name until question 14 is answered. The data engineer will then
+decide whether `anonymous_installation_id`, `anonymous_player_id`, or the current name best matches its actual
+lifecycle.
 
 ## 8. Unity Implementation Steps
 
@@ -199,7 +205,7 @@ used when available.
 Expected result at the current baseline:
 
 ```text
-85 passed
+92 passed
 ```
 
 ### Validate a Unity-Generated Run
@@ -265,7 +271,7 @@ Return the following items to the data team:
 
 Verified locally on 2026-08-31:
 
-- automated contract suite: `85 passed`;
+- automated contract suite: `92 passed`;
 - valid eight-record P0 Run sequence: accepted;
 - valid CLI exit code: `0`;
 - event containing `steam_id`: rejected with `prohibited_field`; and
