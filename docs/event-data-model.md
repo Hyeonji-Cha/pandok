@@ -10,7 +10,7 @@ All P0 events contain these fields.
 | `event_name` | P0 event category | One of six supported values, required |
 | `event_time` | Time the gameplay fact occurred | UTC ISO 8601 date-time, required |
 | `source_type` | Production play, controlled validation, or load testing | One of three supported values, required and consistent within a Run |
-| `anonymous_user_id` | Random installation identity created after consent | UUID, required |
+| `anonymous_user_id` | Random pseudonymous identity created when telemetry is enabled | UUID, required; retained while consent remains, deleted on revocation, and regenerated after renewed consent |
 | `session_id` | One application-session identity | UUID, required |
 | `run_id` | One gameplay-attempt identity | UUID for Run events; optional for session start |
 | `game_version` | Actual game build version | Non-empty stable string, required |
@@ -35,9 +35,10 @@ starting weapon when those concepts and values are available.
 | `choice_sequence` | One-based choice order in the Run | Positive integer, required |
 | `run_elapsed_seconds` | Active gameplay time | Non-negative number, required |
 | `player_level` | Level when options appeared | Non-negative integer when present |
-| `options` | Exactly the two displayed options | Array of exactly two unique slots |
+| `options` | Options actually displayed to the player | Two slots for level-up sources; three distinct items for `statue` |
 
-Each option contains `slot`, stable `item_id`, `rarity`, and optional `level_before`.
+Each option contains `slot`, stable `item_id`, and `rarity`. Optional state fields are
+`acquisition_count_before`, `effect_type`, and `effect_value_before`.
 
 ### Upgrade Selected
 
@@ -46,15 +47,15 @@ rarity, Run time, optional player level, and optional before/after upgrade count
 
 ### Run Checkpoint
 
-A cumulative Run state summary emitted every 60 seconds of active gameplay. It may contain level, XP
-progress, health percentage, cumulative kills/XP/gold, pickup totals, miniboss progress, and a list of
-active upgrades. Values that are present are type- and range-checked.
+A cumulative Run state summary emitted every 60 seconds of active gameplay, excluding paused time.
+Level, current XP, next-level XP, health percentage, literal cumulative kills, and current gold balance
+are required. Additional cumulative totals and upgrade snapshots remain optional.
 
 ### Run Ended
 
-The final available cumulative Run state. `end_reason` initially supports `player_death`,
-`player_quit`, `run_completed`, `application_closed`, and `unknown`; unsupported game-specific reasons
-require a compatible contract revision. A final upgrade list may be included.
+The final available cumulative Run state. `end_reason` supports `player_death`, `player_quit`,
+`player_restart`, `run_completed`, `application_closed`, and `unknown`. A final upgrade list may be
+included.
 
 ## Nested Entities
 
@@ -62,23 +63,28 @@ require a compatible contract revision. A final upgrade list may be included.
 
 | Field | Validation |
 |---|---|
-| `slot` | Integer 1 or 2 |
+| `slot` | Integer 1 or 2 for level-up sources; 1, 2, or 3 for `statue` |
 | `item_id` | Stable lowercase identifier |
 | `rarity` | Stable lowercase identifier |
-| `level_before` | Non-negative integer when present |
+| `acquisition_count_before` | Non-negative integer when present |
+| `effect_type` | Stable lowercase identifier when present |
+| `effect_value_before` | Number or boolean when present |
 
 ### Upgrade State
 
 | Field | Validation |
 |---|---|
 | `item_id` | Stable lowercase identifier |
-| `upgrade_count` | Positive integer |
+| `acquisition_count` | Positive integer |
+| `effect_type` | Stable lowercase identifier when present |
+| `effect_value` | Number or boolean when present |
 
 ## Relationships and Invariants
 
-- All Run events in a sequence share one anonymous user, session, Run, game version, and schema version.
+- All Run events in a sequence share one anonymous user, session, Run, game version, schema version, and source type.
 - Event identifiers are unique within a logical sequence; exact repeated IDs represent delivery retries.
-- `run_started` precedes other Run events by event time.
+- Only the initial `level_up_weapon` shown and selected events may precede `run_started`, and both use
+  `run_elapsed_seconds: 0` with the preallocated `run_id`.
 - Each `upgrade_selected` references one `upgrade_options_shown` choice and matches one shown option.
 - Choice sequence numbers and checkpoint numbers increase within a Run.
 - Active Run time and cumulative counters do not decrease in event-time order.

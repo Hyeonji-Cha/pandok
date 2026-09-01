@@ -71,9 +71,12 @@ effect. `effect_type` identifies an effect and its value may be a number or bool
 counters and complete effect snapshots are optional and marked `implementation required` until Unity
 provides the required Run counters and Snapshot API.
 
-Existing Unity code exposes player level, current XP, next-level XP, HP, cumulative kills, and current
-gold. Total acquired XP, total acquired gold, per-item acquisition totals, complete active upgrades,
-and miniboss reached/cleared counts require additional Unity instrumentation.
+Unity maps player level and XP from `PlayerXP`, HP from Malbers Stats, current balance from
+`GoldCounterUI.GetGold()`, and stable analytics identifiers from `PandokTelemetryIds`. `total_kills`
+uses a dedicated literal death counter incremented when an enemy death is confirmed; it must not use
+a potentially weighted UI score. Total acquired XP, total acquired gold, per-item acquisition totals,
+complete active upgrades, and miniboss reached/cleared counts remain optional until reliable sources
+exist.
 
 `run_ended.end_reason` includes `player_restart` in addition to the existing values.
 
@@ -90,6 +93,8 @@ and miniboss reached/cleared counts require additional Unity instrumentation.
 
 - No event may be created or sent before explicit consent.
 - Revocation stops new events and discards unsent queued events.
+- `anonymous_user_id` is created when telemetry is enabled, deleted on revocation, and regenerated
+  rather than reused after renewed consent.
 - Direct-identifying fields are forbidden at all nesting levels.
 
 ## Compatibility

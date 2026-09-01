@@ -1,8 +1,8 @@
 # Unity P0 Telemetry Integration Plan
 
-**Status**: Draft  
-**Review baseline**: 2026-08-31  
-**Scope**: P0 telemetry for one game Run
+- **Status**: Draft
+- **Review baseline**: 2026-09-01
+- **Scope**: P0 telemetry for Demo / Controlled Scenario integration
 
 ## 1. Purpose
 
@@ -63,13 +63,13 @@ No other Run event may occur before `run_started`.
 
 | Field | Meaning | Contract status |
 |---|---|---|
-| `event_id` | UUID used for retry and deduplication | Required |
+| `event_id` | UUID used for retry and deduplication | Required; create once per logical event and never change during retry |
 | `event_name` | Event type | Required |
 | `event_time` | UTC event occurrence time | Required |
 | `source_type` | Event source classification | Required; must match the approved producer and collection scenario |
-| `anonymous_user_id` | Anonymous UUID with no direct identifier | Required; Unity creation and lifetime mapping pending |
-| `session_id` | Application-session UUID | Required; Unity lifecycle mapping pending |
-| `run_id` | UUID connecting one Run | Required for Run events |
+| `anonymous_user_id` | Anonymous UUID with no direct identifier | Required; create when telemetry is enabled, delete on revocation, and regenerate after renewed consent |
+| `session_id` | Application-session UUID | Required; create a new UUID for each consented application session |
+| `run_id` | UUID connecting one Run | Required for Run events; allocate before initial weapon options are shown |
 | `game_version` | Game version that produced the event | Required |
 | `schema_version` | Telemetry contract version | Required; current Draft value is `1.0` |
 
@@ -82,21 +82,19 @@ version decision.
 
 ## 5. Values Currently Identified as Available in Unity
 
-The following values were identified during the earlier Unity code review. The developer must record
-the exact class, property, or enum location used by the integration:
+The developer policy identifies the following Unity mappings. Final acceptance still requires exact
+code references and build-based evidence.
 
-- player level;
-- current XP;
-- XP required for the next level;
-- HP or HP percentage;
-- cumulative Run kills;
-- current gold balance;
-- two-option level-up flows;
-- three-option statue flows;
-- confirmed `ChestItemType` values; and
-- distinct death and player-restart end flows.
-
-It is confirmed that `total_kills` starts at zero for each Run and is cumulative within that Run.
+| Contract value | Unity source | Confirmed meaning |
+|---|---|---|
+| `player_level` | `PlayerXP.level` | Current player level |
+| `current_xp` | `PlayerXP.currentXP` | XP within the current level |
+| `xp_to_next_level` | `PlayerXP.xpToNextLevel` | Required XP threshold; greater than zero |
+| `hp_percent` | Malbers Stats current/max health | Percentage from 0 through 100 |
+| `total_kills` | Dedicated telemetry literal-death counter | Reset to zero per Run and increment once per confirmed enemy death |
+| `current_gold` | `GoldCounterUI.GetGold()` | Current balance, not total acquired gold |
+| stable `item_id` | `PandokTelemetryIds` | Stable analytics ID; never a localized display name |
+| `rarity` | `UpgradeRarity` / `ChestRarity` | Base-weapon convention still requires final code evidence |
 
 ## 6. Values Requiring Additional Unity Work
 
@@ -109,10 +107,9 @@ send them until Unity exposes a reliable counter or snapshot API:
 - a complete active-upgrade snapshot;
 - current effect values for each upgrade;
 - miniboss reached and cleared counters;
-- final stable string IDs for level-up weapons and upgrades; and
 - local queue, retry, and purge behavior for network failures.
 
-## 7. Confirmed Decisions and Remaining Questions
+## 7. Confirmed Decisions and Required Evidence
 
 ### Confirmed or Agreed
 
@@ -120,30 +117,24 @@ send them until Unity exposes a reliable counter or snapshot API:
 |---:|---|---|
 | 1 | The six P0 event emission points match the gameplay flow | Confirmed |
 | 2 | Initial weapon selection occurs before `run_started` | Confirmed |
+| 3 | Required gameplay values map to `PlayerXP`, Malbers Stats, a dedicated kill counter, and `GoldCounterUI` | Policy confirmed; exact code references still required |
+| 4 | `current_gold` is current balance, not total gold acquired | Confirmed |
 | 5 | `total_kills` resets to zero at Run start and is cumulative | Confirmed |
+| 6 | Stable item IDs are provided through `PandokTelemetryIds` | Policy confirmed; code evidence still required |
+| 7 | UUIDs use the lifetimes defined in section 8.2 | Policy confirmed; runtime evidence still required |
+| 8 | Retries reuse the original `event_id` and payload without recalculation | Policy confirmed; runtime evidence still required |
+| 9 | Death, restart, and quit produce distinct Run-end paths | Policy confirmed; runtime evidence still required |
+| 10 | Consent defaults OFF and pre-consent event and queue counts remain zero | Policy confirmed; runtime evidence still required |
 | 11 | Revoking consent must discard every unsent event | Policy agreed; Unity implementation evidence still required |
 | 12 | Schema `1.0` is not externally consumed | Resolved as `unused_draft`; no developer review required |
+| 13 | Unavailable optional values are omitted rather than replaced with placeholders | Confirmed |
+| 14 | `anonymous_user_id` is created when telemetry is enabled, deleted on revocation, and regenerated after renewed consent | Confirmed |
 
-### Remaining Developer Questions
+### Remaining Implementation Evidence
 
-The original numbers are retained for traceability. For each question, answer `Supported`,
-`Change required`, or `Currently unavailable`, and provide the relevant code location.
-
-| Number | Question | Answer | Unity code location or notes |
-|---:|---|---|---|
-| 3 | Which classes and properties provide `player_level`, XP, HP, kills, and gold? |  |  |
-| 4 | Is `current_gold` the current balance, distinct from total gold acquired during the Run? |  |  |
-| 6 | Do weapons and upgrades have stable string IDs suitable for persistence and analytics? |  |  |
-| 7 | Can Unity create and retain `event_id`, `session_id`, and `run_id` UUIDs for their required lifetimes? |  |  |
-| 8 | Can retries preserve the same `event_id` and byte-equivalent logical payload? |  |  |
-| 9 | Can the Run-end path reliably distinguish `player_death` from `player_restart`? |  |  |
-| 10 | Can Unity guarantee that no event is created or queued before explicit consent? |  |  |
-| 13 | Are any contract fields unavailable or semantically different in the current Unity implementation? |  |  |
-| 14 | When is the anonymous UUID created after consent, does it persist across game restarts, and is it reused after revocation and renewed consent? |  |  |
-
-Keep the current `anonymous_user_id` field name until question 14 is answered. The data engineer will then
-decide whether `anonymous_installation_id`, `anonymous_player_id`, or the current name best matches its actual
-lifecycle.
+The policy answers the earlier semantic questions, but it does not prove the shipped Unity behavior.
+Return exact class and method locations, one unedited generated Run, and runtime evidence for UUID
+lifecycle, consent-before-creation, queue purge, same-payload retry, and distinct Run-end paths.
 
 ## 8. Unity Implementation Steps
 
@@ -156,11 +147,13 @@ lifecycle.
 
 ### 8.2 Implement Identifier Lifetimes
 
-1. Create `anonymous_user_id` only within the approved consent lifecycle.
-2. Create one `session_id` for the application session.
-3. Allocate `run_id` before the initial weapon choice and retain it through `run_ended`.
-4. Create a unique `event_id` once for each logical event.
-5. Persist the original `event_id` and payload for retries.
+1. Create `anonymous_user_id` when telemetry is explicitly enabled.
+2. Retain it only while that consent remains active; delete it on revocation and create a new UUID
+   after renewed consent.
+3. Create one `session_id` for the application session.
+4. Allocate `run_id` before the initial weapon choice and retain it through `run_ended`.
+5. Create a unique `event_id` once for each logical event.
+6. Persist the original `event_id` and payload for retries without rebuilding timestamps or snapshots.
 
 ### 8.3 Implement Choice Linking
 
@@ -247,16 +240,28 @@ Run Unity build scenarios that demonstrate:
 - zero events queued before consent;
 - no new events created or queued after revocation;
 - zero unsent events remaining immediately after revocation; and
-- zero purged events restored after application restart.
+- zero purged events restored after application restart; and
+- a new `anonymous_user_id` after telemetry is enabled again.
 
 Record the Unity build version, test date, scenario steps, observed counts, code locations, and test
 result for each scenario.
+
+### 10.1 Network and Deployment Checks
+
+- Never add an IP address to the telemetry payload.
+- Review API Gateway, reverse-proxy, CDN, and access-log behavior separately from payload validation;
+  minimize retention or mask network identifiers when they are not required.
+- Permit HTTPS only for production telemetry endpoints.
+- Keep real player-level raw JSON out of the public repository.
+- Before global distribution, review the Privacy Notice, retention period, age policy, and any
+  authorized access from Turkiye against the actual deployment and applicable legal requirements.
+- Treat the developer policy as an engineering baseline, not as final legal advice.
 
 ## 11. Required Developer Deliverables
 
 Return the following items to the data team:
 
-- answers to questions 3, 4, 6, 7, 8, 9, 10, and 13;
+- exact code references and runtime evidence for the confirmed policies in section 7;
 - the list of changed Unity files;
 - event-by-event Unity emission code locations;
 - the class, property, and enum mapping for required fields;
@@ -269,7 +274,7 @@ Return the following items to the data team:
 
 ## 12. Current Verification Baseline
 
-Verified locally on 2026-08-31:
+Verified locally on 2026-09-01:
 
 - automated contract suite: `92 passed`;
 - valid eight-record P0 Run sequence: accepted;
@@ -278,13 +283,13 @@ Verified locally on 2026-08-31:
 - invalid CLI exit code: `1`.
 
 The project targets Python 3.12. The current local compatibility verification was performed with
-Python 3.11.2, so Python 3.12 verification remains pending.
+Python 3.12.10.
 
 ## 13. Completion Criteria
 
 The Unity integration is ready for acceptance when all of the following are true:
 
-- all remaining developer questions are answered with code references;
+- all confirmed developer policies are backed by code references and runtime evidence;
 - an unedited Unity-generated Run passes `validate-sequence`;
 - all six P0 event types are emitted at the confirmed lifecycle points;
 - shown and selected choices link correctly;
