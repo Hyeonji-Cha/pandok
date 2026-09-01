@@ -27,7 +27,7 @@ ANONYMOUS_SCHEMA_PATH = (
     Path(__file__).resolve().parents[2] / "contracts" / "telemetry-event-v2.schema.json"
 )
 
-_PROHIBITED_KEYS = {
+_V1_PROHIBITED_KEYS = frozenset({
     "steamid",
     "steamnickname",
     "email",
@@ -43,7 +43,60 @@ _PROHIBITED_KEYS = {
     "userid",
     "ip",
     "ipaddress",
-}
+})
+
+# v2 개인정보 경계를 넘을 수 없는 계정·기기·네트워크·인증 관련 키
+_ANONYMOUS_PROHIBITED_KEYS = _V1_PROHIBITED_KEYS | frozenset({
+    "accountdata",
+    "accountid",
+    "accountidentifier",
+    "auth",
+    "authorization",
+    "cfconnectingip",
+    "clientip",
+    "cookie",
+    "discordid",
+    "filepath",
+    "fingerprint",
+    "forwarded",
+    "fullname",
+    "gps",
+    "hardwareid",
+    "hardwareuuid",
+    "headers",
+    "installationid",
+    "installationidentifier",
+    "latitude",
+    "location",
+    "longitude",
+    "mac",
+    "macaddress",
+    "machineid",
+    "machineidentifier",
+    "name",
+    "nickname",
+    "operatingsystemusername",
+    "originalheaders",
+    "persistentid",
+    "persistentidentifier",
+    "phone",
+    "phonenumber",
+    "playerid",
+    "playeridentifier",
+    "referer",
+    "requestheaders",
+    "session",
+    "sessionid",
+    "sessiontoken",
+    "sourceip",
+    "steamaccountid",
+    "token",
+    "trueclientip",
+    "useragent",
+    "useridentifier",
+    "xforwardedfor",
+    "xrealip",
+})
 
 # 같은 Run의 모든 이벤트에서 동일해야 하는 식별·출처 필드
 _CORRELATION_FIELDS = (
@@ -158,12 +211,13 @@ def _privacy_issues(
     value: Any,
     path: tuple[str | int, ...] = (),
     event_id: str | None = None,
+    prohibited_keys: frozenset[str] = _V1_PROHIBITED_KEYS,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     if isinstance(value, Mapping):
         for key, child in value.items():
             child_path = (*path, str(key))
-            if _normalize_key(str(key)) in _PROHIBITED_KEYS:
+            if _normalize_key(str(key)) in prohibited_keys:
                 issues.append(
                     ValidationIssue(
                         ReasonCode.PROHIBITED_FIELD,
@@ -172,10 +226,24 @@ def _privacy_issues(
                         event_id,
                     )
                 )
-            issues.extend(_privacy_issues(child, child_path, event_id))
+            issues.extend(
+                _privacy_issues(
+                    child,
+                    child_path,
+                    event_id,
+                    prohibited_keys,
+                )
+            )
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            issues.extend(_privacy_issues(child, (*path, index), event_id))
+            issues.extend(
+                _privacy_issues(
+                    child,
+                    (*path, index),
+                    event_id,
+                    prohibited_keys,
+                )
+            )
     return issues
 
 
@@ -250,7 +318,11 @@ def validate_anonymous_event(event: Any) -> list[ValidationIssue]:
         ]
 
     event_id = event.get("event_id") if isinstance(event.get("event_id"), str) else None
-    privacy = _privacy_issues(event, event_id=event_id)
+    privacy = _privacy_issues(
+        event,
+        event_id=event_id,
+        prohibited_keys=_ANONYMOUS_PROHIBITED_KEYS,
+    )
     if privacy:
         return privacy
 
