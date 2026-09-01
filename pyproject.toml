@@ -21,7 +21,10 @@ dev = [
 pandok-contract = "pandok_contracts.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pandok_contracts"]
+packages = [
+  "src/pandok_contracts",
+  "src/pandok_ingestion",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
