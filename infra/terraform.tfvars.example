@@ -1,0 +1,13 @@
+# PANDOK Terraform 입력값의 공개 가능한 예시를 제공한다.
+# 다른 환경을 만들 때 어떤 값을 설정해야 하는지 보여주되 민감정보는 포함하지 않는다.
+
+project_name = "pandok"
+
+# 개인 프로젝트의 기본 배포는 비용이 가장 작은 dev 환경으로 시작한다.
+environment = "dev"
+
+# 게임 운영자가 승인한 Sydney 리전만 사용한다.
+aws_region = "ap-southeast-2"
+
+# Bronze 테스트 데이터는 생성 후 최대 30일까지만 보관한다.
+bronze_retention_days = 30

@@ -18,3 +18,12 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Terraform의 로컬 캐시·상태·개인 설정이 GitHub에 올라가지 않게 한다.
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
