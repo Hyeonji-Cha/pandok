@@ -164,16 +164,20 @@ least-privilege IAM, and explicit review before chargeable AWS resources are app
 
 ## Mandatory field review
 
-Before changing the executable schema, every current telemetry field must be classified:
+Before changing the executable schema, every current telemetry field must be classified. The active draft
+inventory is maintained in [Telemetry Privacy Field Review](privacy-field-review.md):
 
 | Field | Current location | Analysis purpose | Identification risk | Decision | Reason |
 |---|---|---|---|---|---|
-| To be assessed | To be assessed | To be assessed | To be assessed | `KEEP`, `MODIFY`, or `REMOVE` | To be assessed |
+| See the field review | See the field review | See the field review | See the field review | `KEEP`, `MODIFY`, or `REMOVE` | See the field review |
 
 Names alone are not sufficient evidence that a field is anonymous. Direct identifiers, indirect
 identifiers, rare value combinations, timestamps, and external matching risk must all be considered.
 
 ## Mandatory automated privacy evidence
+
+The threat paths, required controls, and residual technical limitations are maintained in
+[Telemetry Privacy Threat Model](privacy-threat-model.md).
 
 Tests must demonstrate that:
 
@@ -208,4 +212,3 @@ Using only data accessible in AWS Sydney, no operator or service must be able to
 person, device, player IP, or determine that separate Runs came from the same player. The Game Client must
 have no direct AWS path, and the Türkiye gateway must terminate the incoming request, reconstruct an
 allow-listed payload, sanitize headers, and create a new outbound request.
-

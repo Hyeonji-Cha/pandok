@@ -83,6 +83,8 @@ message, field path, and event ID when available.
 | Project goal, scope, and completion criteria | `docs/project-scope.md` |
 | Target architecture and service ownership | `docs/architecture.md` |
 | Active Privacy-by-Design requirements and redesign phases | `docs/privacy-by-design.md` |
+| Current telemetry field privacy decisions | `docs/privacy-field-review.md` |
+| Identification threats, controls, tests, and residual risks | `docs/privacy-threat-model.md` |
 | P0 event semantics and validation rules | `docs/event-contract.md` |
 | Contract entities and invariants | `docs/event-data-model.md` |
 | Local contract validation | `docs/contract-validation.md` |

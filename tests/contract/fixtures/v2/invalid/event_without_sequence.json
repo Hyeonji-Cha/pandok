@@ -1,0 +1,9 @@
+{
+  "event_id": "00000000-0000-4000-8000-000000000003",
+  "event_name": "run_started",
+  "source_type": "CONSENTED_PROD_PLAY",
+  "run_id": "30000000-0000-4000-8000-000000000001",
+  "run_elapsed_seconds": 0,
+  "game_version": "1.2.0",
+  "schema_version": "2.0"
+}

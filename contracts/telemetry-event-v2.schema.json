@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandok.dev/contracts/telemetry-event-v2.schema.json",
+  "title": "PANDOK Anonymous Run Telemetry Event v2",
+  "$comment": "Shared anonymous Run-only telemetry contract. It contains no persistent player, session, device, network, or client wall-clock identity.",
+  "oneOf": [
+    {"$ref": "#/$defs/runStarted"},
+    {"$ref": "#/$defs/upgradeOptionsShown"},
+    {"$ref": "#/$defs/upgradeSelected"},
+    {"$ref": "#/$defs/runCheckpoint"},
+    {"$ref": "#/$defs/runEnded"}
+  ],
+  "$defs": {
+    "commonBase": {
+      "$comment": "Fields shared by every event in one anonymous Run.",
+      "type": "object",
+      "required": [
+        "event_id",
+        "event_name",
+        "source_type",
+        "run_id",
+        "event_sequence",
+        "run_elapsed_seconds",
+        "game_version",
+        "schema_version"
+      ],
+      "properties": {
+        "event_id": {"type": "string", "format": "uuid"},
+        "event_name": {"type": "string"},
+        "source_type": {
+          "$comment": "PROD: natural consented play; CONTROLLED: functional validation; LOAD: performance testing.",
+          "enum": [
+            "CONSENTED_PROD_PLAY",
+            "CONTROLLED_SCENARIO",
+            "LOAD_TEST"
+          ]
+        },
+        "run_id": {"type": "string", "format": "uuid"},
+        "event_sequence": {"$ref": "#/$defs/positiveInteger"},
+        "run_elapsed_seconds": {"$ref": "#/$defs/nonNegativeNumber"},
+        "game_version": {"$ref": "#/$defs/gameVersion"},
+        "schema_version": {"const": "2.0"}
+      }
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "gameVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[0-9A-Za-z][0-9A-Za-z._-]*$"
+    },
+    "nonNegativeNumber": {"type": "number", "minimum": 0},
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "positiveInteger": {"type": "integer", "minimum": 1},
+    "hpPercent": {"type": "number", "minimum": 0, "maximum": 100},
+    "choiceSource": {
+      "enum": ["level_up_weapon", "level_up_upgrade", "statue"]
+    },
+    "rarity": {
+      "enum": ["common", "uncommon", "rare", "epic", "legendary"]
+    },
+    "chestItemId": {
+      "enum": [
+        "horseshoe",
+        "gold_ingot",
+        "hourglass",
+        "sword",
+        "bull_skull",
+        "sticky_bone",
+        "greyhound_tooth",
+        "blood_scent"
+      ]
+    },
+    "effectValue": {"type": ["number", "boolean"]},
+    "upgradeOption": {
+      "$comment": "One approved upgrade option displayed during this Run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "item_id", "rarity"],
+      "properties": {
+        "slot": {"type": "integer", "enum": [1, 2, 3]},
+        "item_id": {"$ref": "#/$defs/stableId"},
+        "rarity": {"$ref": "#/$defs/rarity"},
+        "acquisition_count_before": {"$ref": "#/$defs/nonNegativeInteger"},
+        "effect_type": {"$ref": "#/$defs/stableId"},
+        "effect_value_before": {"$ref": "#/$defs/effectValue"}
+      }
+    },
+    "upgradeState": {
+      "$comment": "A bounded snapshot of one approved upgrade in this Run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "acquisition_count"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/stableId"},
+        "acquisition_count": {"$ref": "#/$defs/positiveInteger"},
+        "effect_type": {"$ref": "#/$defs/stableId"},
+        "effect_value": {"$ref": "#/$defs/effectValue"}
+      }
+    },
+    "runStarted": {
+      "$comment": "Emitted when active gameplay begins. Initial weapon-choice events may precede it at elapsed second zero.",
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "properties": {
+            "event_name": {"const": "run_started"},
+            "run_elapsed_seconds": {"const": 0},
+            "map_id": {"$ref": "#/$defs/stableId"},
+            "starting_max_hp": {"type": "number", "exclusiveMinimum": 0},
+            "starting_weapon_id": {"$ref": "#/$defs/stableId"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "upgradeOptionsShown": {
+      "$comment": "Records the approved upgrade choices displayed to the player in this Run.",
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": [
+            "choice_id",
+            "choice_sequence",
+            "choice_source",
+            "options"
+          ],
+          "properties": {
+            "event_name": {"const": "upgrade_options_shown"},
+            "choice_id": {"type": "string", "format": "uuid"},
+            "choice_sequence": {"$ref": "#/$defs/positiveInteger"},
+            "choice_source": {"$ref": "#/$defs/choiceSource"},
+            "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 3,
+              "items": {"$ref": "#/$defs/upgradeOption"}
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"choice_source": {"const": "statue"}},
+                "required": ["choice_source"]
+              },
+              "then": {
+                "properties": {
+                  "options": {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": {
+                      "properties": {
+                        "item_id": {"$ref": "#/$defs/chestItemId"}
+                      }
+                    },
+                    "allOf": [
+                      {"contains": {"properties": {"slot": {"const": 1}}}, "minContains": 1, "maxContains": 1},
+                      {"contains": {"properties": {"slot": {"const": 2}}}, "minContains": 1, "maxContains": 1},
+                      {"contains": {"properties": {"slot": {"const": 3}}}, "minContains": 1, "maxContains": 1}
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "options": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "allOf": [
+                      {"contains": {"properties": {"slot": {"const": 1}}}, "minContains": 1, "maxContains": 1},
+                      {"contains": {"properties": {"slot": {"const": 2}}}, "minContains": 1, "maxContains": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "upgradeSelected": {
+      "$comment": "Records the option selected from one prior shown choice in this Run.",
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": [
+            "choice_id",
+            "choice_sequence",
+            "choice_source",
+            "selected_slot",
+            "selected_item_id",
+            "selected_rarity"
+          ],
+          "properties": {
+            "event_name": {"const": "upgrade_selected"},
+            "choice_id": {"type": "string", "format": "uuid"},
+            "choice_sequence": {"$ref": "#/$defs/positiveInteger"},
+            "choice_source": {"$ref": "#/$defs/choiceSource"},
+            "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "selected_slot": {"type": "integer", "enum": [1, 2, 3]},
+            "selected_item_id": {"$ref": "#/$defs/stableId"},
+            "selected_rarity": {"$ref": "#/$defs/rarity"},
+            "acquisition_count_before": {"$ref": "#/$defs/nonNegativeInteger"},
+            "acquisition_count_after": {"$ref": "#/$defs/positiveInteger"},
+            "effect_type": {"$ref": "#/$defs/stableId"},
+            "effect_value_before": {"$ref": "#/$defs/effectValue"},
+            "effect_value_after": {"$ref": "#/$defs/effectValue"}
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"choice_source": {"const": "statue"}},
+                "required": ["choice_source"]
+              },
+              "then": {
+                "properties": {
+                  "selected_slot": {"enum": [1, 2, 3]},
+                  "selected_item_id": {"$ref": "#/$defs/chestItemId"}
+                }
+              },
+              "else": {
+                "properties": {"selected_slot": {"enum": [1, 2]}}
+              }
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runCheckpoint": {
+      "$comment": "A fixed-interval cumulative snapshot from this Run.",
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": [
+            "checkpoint_number",
+            "player_level",
+            "current_xp",
+            "xp_to_next_level",
+            "hp_percent",
+            "total_kills",
+            "current_gold"
+          ],
+          "properties": {
+            "event_name": {"const": "run_checkpoint"},
+            "checkpoint_number": {"$ref": "#/$defs/positiveInteger"},
+            "player_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "current_xp": {"$ref": "#/$defs/nonNegativeNumber"},
+            "xp_to_next_level": {"type": "number", "exclusiveMinimum": 0},
+            "hp_percent": {"$ref": "#/$defs/hpPercent"},
+            "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
+            "current_gold": {"$ref": "#/$defs/nonNegativeNumber"},
+            "total_gold_collected": {"$ref": "#/$defs/nonNegativeNumber"},
+            "hearts_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_healing_received": {"$ref": "#/$defs/nonNegativeNumber"},
+            "magnets_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "miniboss_waves_cleared": {"$ref": "#/$defs/nonNegativeInteger"},
+            "active_upgrades": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {"$ref": "#/$defs/upgradeState"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runEnded": {
+      "$comment": "The final cumulative state and termination reason for this Run. run_elapsed_seconds is the Run duration.",
+      "allOf": [
+        {"$ref": "#/$defs/commonBase"},
+        {
+          "type": "object",
+          "required": [
+            "end_reason",
+            "final_level",
+            "total_kills",
+            "current_gold"
+          ],
+          "properties": {
+            "event_name": {"const": "run_ended"},
+            "end_reason": {
+              "enum": [
+                "player_death",
+                "player_quit",
+                "player_restart",
+                "run_completed",
+                "application_closed",
+                "unknown"
+              ]
+            },
+            "final_level": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
+            "current_gold": {"$ref": "#/$defs/nonNegativeNumber"},
+            "total_gold_collected": {"$ref": "#/$defs/nonNegativeNumber"},
+            "hearts_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total_healing_received": {"$ref": "#/$defs/nonNegativeNumber"},
+            "magnets_collected": {"$ref": "#/$defs/nonNegativeInteger"},
+            "miniboss_waves_reached": {"$ref": "#/$defs/nonNegativeInteger"},
+            "miniboss_waves_cleared": {"$ref": "#/$defs/nonNegativeInteger"},
+            "final_upgrades": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {"$ref": "#/$defs/upgradeState"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
