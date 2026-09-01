@@ -10,7 +10,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from pandok_contracts import ValidationIssue, validate_sequence
+from pandok_contracts import (
+    SequenceStatus,
+    ValidationIssue,
+    validate_anonymous_sequence,
+    validate_sequence,
+)
 
 
 # 생성 전후 계약 검증에서 발견된 오류들을 하나의 예외로 전달한다.
@@ -96,5 +101,46 @@ def generate_controlled_sequence(
     generated_issues = validate_sequence(generated_events)
     if generated_issues:
         raise ScenarioGenerationError(generated_issues)
+
+    return generated_events
+
+
+def generate_anonymous_controlled_sequence(
+    template_events: Sequence[Mapping[str, Any]],
+    *,
+    uuid_factory: Callable[[], UUID] = uuid4,
+) -> list[dict[str, Any]]:
+    """Create one contract-valid anonymous v2 Run from a template."""
+    # v1과 마찬가지로 반복 생성 과정에서 원본 fixture가 바뀌지 않게 한다.
+    generated_events = deepcopy(
+        [dict(event) for event in template_events]
+    )
+
+    template_result = validate_anonymous_sequence(generated_events)
+    if template_result.status is not SequenceStatus.VALID:
+        raise ScenarioGenerationError(template_result.issues)
+
+    run_id = str(uuid_factory())
+    event_ids: dict[str, str] = {}
+    choice_ids: dict[str, str] = {}
+
+    # 원본 ID를 새 ID에 대응시켜 동일 논리 이벤트의 retry와 선택 연결을 보존한다.
+    for event in generated_events:
+        original_event_id = str(event["event_id"])
+        if original_event_id not in event_ids:
+            event_ids[original_event_id] = str(uuid_factory())
+        event["event_id"] = event_ids[original_event_id]
+        event["run_id"] = run_id
+        event["source_type"] = "CONTROLLED_SCENARIO"
+
+        original_choice_id = event.get("choice_id")
+        if isinstance(original_choice_id, str):
+            if original_choice_id not in choice_ids:
+                choice_ids[original_choice_id] = str(uuid_factory())
+            event["choice_id"] = choice_ids[original_choice_id]
+
+    generated_result = validate_anonymous_sequence(generated_events)
+    if generated_result.status is not SequenceStatus.VALID:
+        raise ScenarioGenerationError(generated_result.issues)
 
     return generated_events
