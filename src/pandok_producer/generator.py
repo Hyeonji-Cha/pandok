@@ -1,4 +1,5 @@
-# 정상 P0 템플릿을 새로운 식별자와 시각을 가진 제어 시나리오로 변환한다.
+# 미리 만든 정상 이벤트 예시를 복사해 실행마다 UUID와 발생 시각을 새로 만든다.
+# Unity 없이 수집 파이프라인을 반복 검증할 CONTROLLED_SCENARIO 데이터를 만들기 위해 사용한다.
 # Bronze 포장은 수집 계층에 맡겨 실제 Unity처럼 원본 이벤트만 공급하기 위해 사용한다.
 
 from __future__ import annotations
