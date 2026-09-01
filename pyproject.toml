@@ -24,6 +24,7 @@ pandok-contract = "pandok_contracts.cli:main"
 packages = [
   "src/pandok_contracts",
   "src/pandok_ingestion",
+  "src/pandok_producer",
 ]
 
 [tool.pytest.ini_options]
