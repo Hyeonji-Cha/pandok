@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandok.dev/kingcharles_turkiye_gateway/contracts/aggregate-export-v1.schema.json",
+  "title": "King Charles Türkiye Aggregate Export v1",
+  "description": "Aggregate-only downstream handoff from the Türkiye Privacy Gateway. No player, session, run, event, network, device, or account identifier is allowed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "bucket_date",
+    "revision",
+    "source_region",
+    "destination_region",
+    "privacy_mode",
+    "data_class",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aggregate-export-v1"
+    },
+    "bucket_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_region": {
+      "const": "TR"
+    },
+    "destination_region": {
+      "const": "ap-southeast-2"
+    },
+    "privacy_mode": {
+      "const": "aggregate_only"
+    },
+    "data_class": {
+      "enum": [
+        "SYNTHETIC_TEST",
+        "PRIVACY_RELEASED_PROD_AGGREGATE"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_counts",
+        "upgrade_option_counts",
+        "upgrade_selected_counts",
+        "run_checkpoint_counts",
+        "run_end_counts"
+      ],
+      "properties": {
+        "event_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_name",
+              "count"
+            ],
+            "properties": {
+              "event_name": {
+                "enum": [
+                  "run_started",
+                  "upgrade_options_shown",
+                  "upgrade_selected",
+                  "run_checkpoint",
+                  "run_ended"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "upgrade_option_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "item_id",
+              "rarity",
+              "slot",
+              "shown_count"
+            ],
+            "properties": {
+              "item_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "rarity": {
+                "enum": [
+                  "common",
+                  "uncommon",
+                  "rare",
+                  "epic",
+                  "legendary"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "shown_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "upgrade_selected_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "item_id",
+              "rarity",
+              "slot",
+              "selected_count"
+            ],
+            "properties": {
+              "item_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "rarity": {
+                "enum": [
+                  "common",
+                  "uncommon",
+                  "rare",
+                  "epic",
+                  "legendary"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "selected_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "run_checkpoint_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "checkpoint_number",
+              "checkpoint_count",
+              "player_level_sum",
+              "current_xp_sum",
+              "xp_to_next_level_sum",
+              "hp_percent_sum",
+              "total_kills_sum",
+              "current_gold_sum"
+            ],
+            "properties": {
+              "checkpoint_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "checkpoint_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "player_level_sum": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "current_xp_sum": {
+                "type": "number",
+                "minimum": 0
+              },
+              "xp_to_next_level_sum": {
+                "type": "number",
+                "minimum": 0
+              },
+              "hp_percent_sum": {
+                "type": "number",
+                "minimum": 0
+              },
+              "total_kills_sum": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "current_gold_sum": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "run_end_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "end_reason",
+              "end_count",
+              "run_duration_seconds_sum",
+              "final_level_sum",
+              "total_kills_sum",
+              "current_gold_sum"
+            ],
+            "properties": {
+              "end_reason": {
+                "enum": [
+                  "player_death",
+                  "player_quit",
+                  "player_restart",
+                  "run_completed",
+                  "application_closed",
+                  "unknown"
+                ]
+              },
+              "end_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "run_duration_seconds_sum": {
+                "type": "number",
+                "minimum": 0
+              },
+              "final_level_sum": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_kills_sum": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "current_gold_sum": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

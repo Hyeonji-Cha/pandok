@@ -1,0 +1,101 @@
+{
+  "schema_version": "aggregate-export-v1",
+  "bucket_date": "2099-01-01",
+  "revision": 1,
+  "source_region": "TR",
+  "destination_region": "ap-southeast-2",
+  "privacy_mode": "aggregate_only",
+  "data_class": "SYNTHETIC_TEST",
+  "metrics": {
+    "event_counts": [
+      {
+        "event_name": "run_started",
+        "count": 120
+      },
+      {
+        "event_name": "upgrade_options_shown",
+        "count": 260
+      },
+      {
+        "event_name": "upgrade_selected",
+        "count": 180
+      },
+      {
+        "event_name": "run_checkpoint",
+        "count": 410
+      },
+      {
+        "event_name": "run_ended",
+        "count": 115
+      }
+    ],
+    "upgrade_option_counts": [
+      {
+        "item_id": "bone",
+        "rarity": "common",
+        "slot": 1,
+        "shown_count": 55
+      },
+      {
+        "item_id": "steak",
+        "rarity": "common",
+        "slot": 2,
+        "shown_count": 49
+      }
+    ],
+    "upgrade_selected_counts": [
+      {
+        "item_id": "bone",
+        "rarity": "common",
+        "slot": 1,
+        "selected_count": 31
+      },
+      {
+        "item_id": "steak",
+        "rarity": "common",
+        "slot": 2,
+        "selected_count": 24
+      }
+    ],
+    "run_checkpoint_counts": [
+      {
+        "checkpoint_number": 1,
+        "checkpoint_count": 80,
+        "player_level_sum": 240,
+        "current_xp_sum": 3200,
+        "xp_to_next_level_sum": 6400,
+        "hp_percent_sum": 5600.0,
+        "total_kills_sum": 2400,
+        "current_gold_sum": 960
+      },
+      {
+        "checkpoint_number": 2,
+        "checkpoint_count": 45,
+        "player_level_sum": 225,
+        "current_xp_sum": 2700,
+        "xp_to_next_level_sum": 4500,
+        "hp_percent_sum": 2700.0,
+        "total_kills_sum": 3150,
+        "current_gold_sum": 1350
+      }
+    ],
+    "run_end_counts": [
+      {
+        "end_reason": "player_death",
+        "end_count": 60,
+        "run_duration_seconds_sum": 18000.0,
+        "final_level_sum": 420,
+        "total_kills_sum": 5400,
+        "current_gold_sum": 1800
+      },
+      {
+        "end_reason": "player_restart",
+        "end_count": 20,
+        "run_duration_seconds_sum": 2400.0,
+        "final_level_sum": 80,
+        "total_kills_sum": 600,
+        "current_gold_sum": 220
+      }
+    ]
+  }
+}
