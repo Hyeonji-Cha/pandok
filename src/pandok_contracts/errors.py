@@ -16,10 +16,21 @@ class ReasonCode(StrEnum):
     DUPLICATE_CONFLICT = "duplicate_conflict"
     CORRELATION_MISMATCH = "correlation_mismatch"
     MISSING_RUN_START = "missing_run_start"
+    MISSING_RUN_END = "missing_run_end"
+    EVENT_SEQUENCE_GAP = "event_sequence_gap"
+    EVENT_SEQUENCE_CONFLICT = "event_sequence_conflict"
     EVENT_ORDER_INVALID = "event_order_invalid"
     CHOICE_NOT_FOUND = "choice_not_found"
     CHOICE_MISMATCH = "choice_mismatch"
     COUNTER_DECREASED = "counter_decreased"
+
+
+class SequenceStatus(StrEnum):
+    """Processing decision for one anonymous Run sequence."""
+
+    VALID = "valid"
+    INCOMPLETE = "incomplete"
+    INVALID = "invalid"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,3 +47,11 @@ class ValidationIssue:
         value["code"] = self.code.value
         value["path"] = list(self.path)
         return value
+
+
+@dataclass(frozen=True, slots=True)
+class SequenceValidationResult:
+    """Status and evidence produced by anonymous Run validation."""
+
+    status: SequenceStatus
+    issues: tuple[ValidationIssue, ...] = ()
