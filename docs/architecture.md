@@ -1,5 +1,10 @@
 # PANDOK Architecture
 
+> **Redesign status:** The direct Steam-to-AWS path below is the previous architecture and must not be
+> implemented or deployed. The active requirements are in
+> [Privacy-by-Design Telemetry Baseline](privacy-by-design.md). This document will be rewritten only after
+> the read-only repository, field, risk, schema, and architecture review in redesign Phases 1-6.
+
 ## Target flow
 
 ```text
