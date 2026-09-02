@@ -12,6 +12,8 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $buildRoot = Join-Path $repositoryRoot "build"
 $packageDirectory = Join-Path $buildRoot "lambda-package"
 $zipPath = Join-Path $buildRoot "pandok-ingestion-lambda.zip"
+$contractDirectory = Join-Path $packageDirectory "contracts"
+$contractPath = Join-Path $repositoryRoot "contracts\telemetry-event-v2.schema.json"
 
 # 이전 빌드 파일이 새 패키지에 섞이지 않도록 저장소 내부 build 경로만 초기화한다.
 if (Test-Path -LiteralPath $packageDirectory) {
@@ -41,9 +43,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Lambda package dependency installation failed."
 }
 
-Compress-Archive `
-    -Path (Join-Path $packageDirectory "*") `
-    -DestinationPath $zipPath `
-    -CompressionLevel Optimal
+# Validator가 Lambda 루트에서도 같은 실행 계약을 읽도록 v2 Schema를 함께 넣는다.
+New-Item -ItemType Directory -Path $contractDirectory -Force | Out-Null
+Copy-Item -LiteralPath $contractPath -Destination $contractDirectory
+
+# .NET 압축 API는 파일 접근 오류를 terminating exception으로 전달해 불완전 ZIP을 성공으로 오인하지 않는다.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory(
+    $packageDirectory,
+    $zipPath,
+    [System.IO.Compression.CompressionLevel]::Optimal,
+    $false
+)
+
+if (-not (Test-Path -LiteralPath $zipPath)) {
+    throw "Lambda package ZIP was not created."
+}
 
 Write-Output "Lambda package created: $zipPath"
