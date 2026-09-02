@@ -19,12 +19,12 @@ def bronze_builder_spy(monkeypatch: pytest.MonkeyPatch) -> Mock:
 
 # 계약을 통과한 실제 fixture가 Bronze 레코드로 생성되는지 확인한다.
 def test_prepare_bronze_record_accepts_valid_event(
-    valid_sequence: list[dict[str, Any]],
+    anonymous_sequence: list[dict[str, Any]],
 ) -> None:
     valid_event = next(
         event
-        for event in valid_sequence
-        if event["event_name"] == "session_started"
+        for event in anonymous_sequence
+        if event["event_name"] == "run_started"
     )
 
     record = pipeline.prepare_bronze_record(
@@ -49,10 +49,10 @@ def test_prepare_bronze_record_accepts_valid_event(
 
 # 필수 필드가 누락된 이벤트를 Schema 오류로 거부하는지 확인한다.
 def test_prepare_bronze_record_rejects_missing_required_field(
-    valid_sequence: list[dict[str, Any]],
+    anonymous_sequence: list[dict[str, Any]],
     bronze_builder_spy: Mock,
 ) -> None:
-    invalid_event = deepcopy(valid_sequence[0])
+    invalid_event = deepcopy(anonymous_sequence[0])
     del invalid_event["event_id"]
 
     with pytest.raises(pipeline.EventContractError) as captured:
@@ -66,10 +66,10 @@ def test_prepare_bronze_record_rejects_missing_required_field(
 
 # 금지된 개인정보 필드가 포함된 이벤트를 거부하는지 확인한다.
 def test_prepare_bronze_record_rejects_prohibited_field(
-    valid_sequence: list[dict[str, Any]],
+    anonymous_sequence: list[dict[str, Any]],
     bronze_builder_spy: Mock,
 ) -> None:
-    invalid_event = deepcopy(valid_sequence[0])
+    invalid_event = deepcopy(anonymous_sequence[0])
     invalid_event["ip_address"] = "192.0.2.1"
 
     with pytest.raises(pipeline.EventContractError) as captured:

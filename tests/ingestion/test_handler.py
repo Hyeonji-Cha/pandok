@@ -13,9 +13,9 @@ from pandok_ingestion.handler import InvalidJsonError, ingest_json
 
 # 정상 JSON이 계약 검증을 거쳐 Bronze 레코드로 변환되는지 확인한다.
 def test_ingest_json_accepts_valid_json(
-    valid_sequence: list[dict[str, Any]],
+    anonymous_sequence: list[dict[str, Any]],
 ) -> None:
-    valid_event = valid_sequence[0]
+    valid_event = anonymous_sequence[0]
 
     record = ingest_json(
         json.dumps(valid_event),
@@ -33,7 +33,7 @@ def test_ingest_json_accepts_valid_json(
 def test_ingest_json_rejects_invalid_json() -> None:
     with pytest.raises(InvalidJsonError) as captured:
         ingest_json(
-            '{"event_name": "session_started"',
+            '{"event_name": "run_started"',
             "scenario_generator",
         )
 

@@ -4,11 +4,9 @@
 from .generator import (
     ScenarioGenerationError,
     generate_anonymous_controlled_sequence,
-    generate_controlled_sequence,
 )
 
 __all__ = [
     "ScenarioGenerationError",
     "generate_anonymous_controlled_sequence",
-    "generate_controlled_sequence",
 ]

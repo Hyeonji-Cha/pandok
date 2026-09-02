@@ -16,6 +16,12 @@ def read_json(path: Path) -> Any:
         return json.load(handle)
 
 
+# ingestion 테스트에서 실제 v2 Run 이벤트를 공통으로 사용한다.
 @pytest.fixture
-def valid_sequence() -> list[dict[str, Any]]:
-    return read_json(FIXTURES / "valid" / "p0_run_sequence.json")
+def anonymous_sequence() -> list[dict[str, Any]]:
+    return read_json(
+        FIXTURES
+        / "v2"
+        / "valid"
+        / "anonymous_p0_run_sequence.json"
+    )

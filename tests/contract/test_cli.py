@@ -11,19 +11,29 @@ def test_valid_sequence_cli_returns_structured_success(capsys):
     result = main(
         [
             "validate-sequence",
-            str(FIXTURES / "valid" / "p0_run_sequence.json"),
+            str(
+                FIXTURES
+                / "v2"
+                / "valid"
+                / "anonymous_p0_run_sequence.json"
+            ),
         ]
     )
     output = json.loads(capsys.readouterr().out)
     assert result == 0
-    assert output == {"valid": True, "event_count": 8, "issues": []}
+    assert output == {"valid": True, "event_count": 5, "issues": []}
 
 
 def test_invalid_event_cli_returns_structured_failure(capsys):
     result = main(
         [
             "validate-event",
-            str(FIXTURES / "invalid" / "event_with_steam_id.json"),
+            str(
+                FIXTURES
+                / "v2"
+                / "invalid"
+                / "event_with_persistent_identifiers.json"
+            ),
         ]
     )
     output = json.loads(capsys.readouterr().out)

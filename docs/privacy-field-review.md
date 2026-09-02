@@ -108,30 +108,17 @@ to a player, account, installation, or device.
 | `metadata.received_at` | Millisecond AWS ingestion timestamp | Supports arrival, lateness, and operational analysis | Precise time can correlate a Run with external activity | `MODIFY` | Define minimum precision and retention; keep it out of Gold and LLM inputs |
 | `metadata.ingestion_channel` | Distinguishes Unity, scenario, and load producers | Verifies `source_type` authorization | Current `unity_client` path implies direct client ingestion | `MODIFY` | Replace production input with an authenticated Türkiye-gateway channel |
 
-## Findings that block schema implementation
+## Implemented v2 privacy boundary
 
-1. The current contract requires `anonymous_user_id` and `session_id`, so it permits cross-Run linkage.
-2. The current validator sorts and compares events using precise `event_time`; replacing it requires a new
-   Run-relative ordering rule rather than deleting the field in isolation.
-3. The current generator creates one anonymous user and session identity for the entire generated sequence.
-4. The Bronze wrapper stores `received_at` with millisecond precision and recognizes `unity_client` as a
-   production ingestion channel.
-5. Several content identifiers use an open string pattern instead of an explicit game-content allow-list.
-6. Detailed upgrade combinations can fingerprint a Run, but they remain analytically necessary and become
-   unacceptable only if AWS can associate the Run with a person or another Run.
+1. AWS-bound events exclude `session_started`, `anonymous_user_id`, and `session_id`.
+2. Run ordering uses `event_sequence` and `run_elapsed_seconds`, not client wall-clock time.
+3. The controlled-scenario generator creates only Run-scoped and event-scoped random IDs.
+4. The v2 validator rejects prohibited identity fields at every nesting depth.
+5. The Bronze wrapper stores only validated v2 payloads plus AWS `received_at` metadata.
 
-## Proposed anonymous-contract direction
+## Remaining implementation work
 
-- Remove `session_started`, `anonymous_user_id`, and `session_id` from AWS-bound telemetry.
-- Keep one random, unmapped `run_id` per Run and one random, unmapped `event_id` per logical event.
-- Replace client wall-clock `event_time` with Run-relative `event_sequence` and existing relative gameplay
-  time fields.
-- Restrict game-content strings to approved values and bound arrays and payload size.
-- Rework production ingestion so only the authenticated Türkiye gateway can submit
-  `CONSENTED_PROD_PLAY`.
-- Keep precise operational time, if it remains necessary, outside product metrics with documented precision
-  and retention.
-
-These proposals require a separate schema-design review before the JSON Schema, validator, fixtures,
-generator, ingestion code, or Terraform is changed.
-
+- Replace the production `unity_client` ingestion channel with authenticated `turkiye_gateway`.
+- Define the minimum `received_at` precision and retention needed for operations.
+- Restrict game-content strings and payload sizes where stable allow-lists are available.
+- Confirm that detailed upgrade combinations cannot be associated with a person or another Run.

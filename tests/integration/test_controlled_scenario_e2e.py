@@ -5,18 +5,17 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from pandok_contracts import validate_sequence
+from pandok_contracts import SequenceStatus, validate_anonymous_sequence
 from pandok_ingestion.handler import ingest_json
-from pandok_producer import generate_controlled_sequence
+from pandok_producer import generate_anonymous_controlled_sequence
 
 
 # 생성된 원본 이벤트 전체가 JSON 파싱과 계약 검증을 거쳐 Bronze에 도달하는지 확인한다.
 def test_controlled_scenario_flows_to_bronze(
-    valid_sequence: list[dict[str, Any]],
+    anonymous_sequence: list[dict[str, Any]],
 ) -> None:
-    generated_events = generate_controlled_sequence(
-        valid_sequence,
-        started_at=datetime(2026, 9, 2, 15, 0, tzinfo=UTC),
+    generated_events = generate_anonymous_controlled_sequence(
+        anonymous_sequence,
     )
     first_received_at = datetime(2026, 9, 2, 16, 0, tzinfo=UTC)
 
@@ -32,7 +31,10 @@ def test_controlled_scenario_flows_to_bronze(
     stored_events = [record["event"] for record in bronze_records]
 
     assert stored_events == generated_events
-    assert validate_sequence(stored_events) == []
+    assert (
+        validate_anonymous_sequence(stored_events).status
+        is SequenceStatus.VALID
+    )
     assert all(
         record["bronze_record_version"] == 1
         for record in bronze_records

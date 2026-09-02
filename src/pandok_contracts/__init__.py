@@ -9,8 +9,6 @@ from .errors import (
 from .validator import (
     validate_anonymous_event,
     validate_anonymous_sequence,
-    validate_event,
-    validate_sequence,
 )
 
 __all__ = [
@@ -20,7 +18,5 @@ __all__ = [
     "ValidationIssue",
     "validate_anonymous_event",
     "validate_anonymous_sequence",
-    "validate_event",
-    "validate_sequence",
 ]
 __version__ = "0.1.0"

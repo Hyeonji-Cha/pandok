@@ -8,7 +8,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .errors import ReasonCode, ValidationIssue
-from .validator import validate_event, validate_sequence
+from .validator import (
+    validate_anonymous_event,
+    validate_anonymous_sequence,
+)
 
 
 Validator = Callable[[Any], list[ValidationIssue]]
@@ -46,10 +49,14 @@ def _run(path: Path, validator: Validator, sequence: bool) -> int:
     return 1 if issues else 0
 
 
+def _validate_sequence(value: Any) -> list[ValidationIssue]:
+    return list(validate_anonymous_sequence(value).issues)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pandok-contract",
-        description="Validate PANDOK telemetry contract v1 JSON files.",
+        description="Validate PANDOK telemetry contract v2 JSON files.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -66,8 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "validate-event":
-        return _run(args.path, validate_event, sequence=False)
-    return _run(args.path, validate_sequence, sequence=True)
+        return _run(args.path, validate_anonymous_event, sequence=False)
+    return _run(args.path, _validate_sequence, sequence=True)
 
 
 if __name__ == "__main__":

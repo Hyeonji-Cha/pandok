@@ -6,16 +6,13 @@ and generates developer-facing game improvement reports from verified Gold metri
 
 ## Current status
 
-The executable P0 telemetry contract and its Python validator are implemented. Unity and AWS ingestion work
-is temporarily paused while the contract and network path are reassessed against the active
-[Privacy-by-Design baseline](docs/privacy-by-design.md). The current contract remains a draft until that
-review and the required Unity evidence are accepted.
+The executable P0 telemetry contract and its Python validator are implemented. PANDOK v2 is the only
+AWS-bound event contract and follows the active [Privacy-by-Design baseline](docs/privacy-by-design.md).
 
 Supported P0 events:
 
 | Event | Purpose |
 |---|---|
-| `session_started` | Start a consented application session |
 | `upgrade_options_shown` | Record choices actually displayed |
 | `upgrade_selected` | Record and correlate the committed choice |
 | `run_started` | Start active gameplay |
@@ -68,8 +65,8 @@ python -m pip install -e ".[dev]"
 ## Validation
 
 ```powershell
-pandok-contract validate-event tests/contract/fixtures/valid/run_started.json
-pandok-contract validate-sequence tests/contract/fixtures/valid/p0_run_sequence.json
+pandok-contract validate-sequence tests/contract/fixtures/v2/valid/anonymous_p0_run_sequence.json
+pandok-contract validate-event tests/contract/fixtures/v2/invalid/event_with_client_time.json
 python -m pytest
 ```
 
@@ -105,7 +102,7 @@ The repository records the following baseline from 2026-08-30/31:
 
 - JSON Schema Draft 2020-12 self-validation passed.
 - Automated contract suite: 92 passed.
-- Valid eight-record P0 Run sequence accepted.
+- Valid five-record anonymous P0 Run sequence accepted.
 - Prohibited `steam_id` rejected with `prohibited_field`.
 - 10,000 single-event validations completed below the 10-second acceptance threshold.
 

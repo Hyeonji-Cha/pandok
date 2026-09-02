@@ -27,7 +27,7 @@ trusted Run analytics, and provide traceable improvement evidence to the game de
 | `CONTROLLED_SCENARIO` | Reproducible functional and edge-case tests | Excluded |
 | `LOAD_TEST` | Throughput, backpressure, and recovery tests | Excluded |
 
-`source_type` is required by the executable v1 draft contract. Events in one Run must use the same value, and
+`source_type` is required by the executable v2 contract. Events in one Run must use the same value, and
 the same `event_id` cannot be reused with a different source. Collection channels must later verify that the
 producer is authorized to use the supplied value.
 

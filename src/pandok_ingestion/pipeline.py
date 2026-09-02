@@ -1,8 +1,13 @@
+# Türkiye Gateway에서 받은 v2 이벤트를 검증한 후 Bronze 레코드로 변환한다.
+# 계약을 위반한 이벤트가 AWS에 저장되는 것을 차단하기 위해 필요하다.
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any, cast
 
-from pandok_contracts import ValidationIssue, validate_event
+from pandok_contracts import (
+    ValidationIssue,
+    validate_anonymous_event,
+)
 
 from .bronze import build_bronze_record
 
@@ -26,7 +31,8 @@ def prepare_bronze_record(
     received_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Validate an event before building its Bronze record."""
-    issues = validate_event(event)
+    # AWS Bronze에 저장하기 전에 익명 v2 계약과 개인정보 제거 규칙을 검증한다.
+    issues = validate_anonymous_event(event)
 
     if issues:
         raise EventContractError(issues)
