@@ -4,11 +4,16 @@
 import json
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
 from pandok_contracts import ReasonCode
-from pandok_ingestion.handler import InvalidJsonError, ingest_json
+from pandok_ingestion.handler import (
+    InvalidJsonError,
+    ingest_json,
+    ingest_json_to_kinesis,
+)
 
 
 # 정상 JSON이 계약 검증을 거쳐 Bronze 레코드로 변환되는지 확인한다.
@@ -27,6 +32,32 @@ def test_ingest_json_accepts_valid_json(
     assert record["metadata"]["received_at"] == (
         "2026-09-01T12:30:00.000Z"
     )
+
+
+# 정상 v2 JSON이 Bronze 포장을 거쳐 Kinesis 전송까지 연결되는지 확인한다.
+def test_ingest_json_to_kinesis_sends_valid_event(
+    anonymous_sequence: list[dict[str, Any]],
+) -> None:
+    valid_event = anonymous_sequence[0]
+    kinesis_client = Mock()
+    kinesis_client.put_record.return_value = {
+        "ShardId": "shardId-000000000000",
+        "SequenceNumber": "12345",
+    }
+
+    response = ingest_json_to_kinesis(
+        json.dumps(valid_event),
+        "turkiye_gateway",
+        stream_name="pandok-dev-telemetry",
+        kinesis_client=kinesis_client,
+        received_at=datetime(2026, 9, 1, 12, 30, tzinfo=UTC),
+    )
+
+    call_arguments = kinesis_client.put_record.call_args.kwargs
+
+    assert call_arguments["StreamName"] == "pandok-dev-telemetry"
+    assert call_arguments["PartitionKey"] == valid_event["run_id"]
+    assert response["SequenceNumber"] == "12345"
 
 
 # JSON 문법이 깨진 요청을 Schema 검증 전에 INVALID_JSON으로 거부하는지 확인한다.

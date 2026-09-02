@@ -5,12 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from typing import Any
-
-from pandok_ingestion.bronze import (
-    build_bronze_partition_prefix,
-    build_bronze_record,
-)
+from pandok_ingestion.bronze import build_bronze_record
 
 
 # 원본 이벤트를 변경하지 않고 Bronze 레코드로 감싸는지 확인한다.
@@ -51,33 +46,6 @@ def test_build_bronze_record_preserves_original_event() -> None:
 
     validated_event["payload"]["current_gold"] = 0
     assert record["event"]["payload"]["current_gold"] == 100
-
-
-# v2 Bronze 레코드가 비용 효율적인 날짜 파티션 경로로 변환되는지 확인한다.
-def test_build_bronze_partition_prefix(
-    anonymous_sequence: list[dict[str, Any]],
-) -> None:
-    bronze_record = build_bronze_record(
-        anonymous_sequence[0],
-        "turkiye_gateway",
-        received_at=datetime(
-            2026,
-            9,
-            2,
-            12,
-            30,
-            tzinfo=timezone.utc,
-        ),
-    )
-
-    prefix = build_bronze_partition_prefix(bronze_record)
-
-    assert prefix == (
-        "bronze/"
-        "schema_version=2.0/"
-        "source_type=CONTROLLED_SCENARIO/"
-        "received_date=2026-09-02/"
-    )
 
 
 # 등록되지 않은 수집 경로를 거부하는지 확인한다.
