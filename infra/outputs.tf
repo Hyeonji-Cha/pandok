@@ -10,3 +10,8 @@ output "firehose_delivery_stream_name" {
   description = "활성화된 PANDOK Bronze Firehose 전송 스트림 이름"
   value       = try(aws_kinesis_firehose_delivery_stream.bronze[0].name, null)
 }
+
+output "ingestion_lambda_function_name" {
+  description = "활성화된 PANDOK ingestion Lambda 함수 이름"
+  value       = try(aws_lambda_function.ingestion[0].function_name, null)
+}

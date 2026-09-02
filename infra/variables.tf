@@ -55,9 +55,9 @@ variable "bronze_retention_days" {
   validation {
     condition = (
       var.bronze_retention_days >= 1 &&
-      var.bronze_retention_days <= 365
+      var.bronze_retention_days <= 30
     )
-    error_message = "데이터 보관 기간은 1일 이상 365일 이하여야 합니다."
+    error_message = "데이터 보관 기간은 1일 이상 30일 이하여야 합니다."
   }
 }
 
@@ -86,5 +86,60 @@ variable "kinesis_shard_count" {
       var.kinesis_shard_count <= 2
     )
     error_message = "Kinesis shard 수는 1~2 사이의 정수여야 합니다."
+  }
+}
+
+variable "ingestion_lambda_memory_mb" {
+  description = "Ingestion Lambda에 할당할 메모리 크기(MiB)"
+  type        = number
+
+  # JSON Schema 검증에 필요한 여유를 두되 개인 프로젝트 비용을 제한한다.
+  default  = 256
+  nullable = false
+
+  validation {
+    condition = contains(
+      [128, 256, 512],
+      var.ingestion_lambda_memory_mb,
+    )
+    error_message = "Lambda 메모리는 128, 256, 512MiB 중 하나여야 합니다."
+  }
+}
+
+variable "ingestion_lambda_timeout_seconds" {
+  description = "Ingestion Lambda 요청 1건의 최대 실행 시간(초)"
+  type        = number
+
+  # 이벤트 1건 검증과 Kinesis 전송만 수행하므로 장시간 실행을 차단한다.
+  default  = 10
+  nullable = false
+
+  validation {
+    condition = (
+      floor(var.ingestion_lambda_timeout_seconds) ==
+      var.ingestion_lambda_timeout_seconds &&
+      var.ingestion_lambda_timeout_seconds >= 3 &&
+      var.ingestion_lambda_timeout_seconds <= 15
+    )
+    error_message = "Lambda 제한 시간은 3~15초 사이의 정수여야 합니다."
+  }
+}
+
+variable "ingestion_lambda_reserved_concurrency" {
+  description = "Ingestion Lambda가 동시에 실행될 수 있는 최대 개수"
+  type        = number
+
+  # 여러 게임 이벤트가 동시에 들어와도 초기 테스트에서 과도한 요청 거부를 피한다.
+  default  = 5
+  nullable = false
+
+  validation {
+    condition = (
+      floor(var.ingestion_lambda_reserved_concurrency) ==
+      var.ingestion_lambda_reserved_concurrency &&
+      var.ingestion_lambda_reserved_concurrency >= 1 &&
+      var.ingestion_lambda_reserved_concurrency <= 10
+    )
+    error_message = "Lambda 예약 동시 실행 수는 1~10 사이의 정수여야 합니다."
   }
 }

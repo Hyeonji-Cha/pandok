@@ -17,3 +17,12 @@ enable_streaming = false
 
 # 개인 프로젝트의 예상 처리량에는 Provisioned shard 1개만 사용한다.
 kinesis_shard_count = 1
+
+# JSON Schema 검증에 필요한 최소한의 실행 메모리를 사용한다.
+ingestion_lambda_memory_mb = 256
+
+# 이벤트 1건이 비정상적으로 오래 실행되며 비용을 발생시키지 않게 한다.
+ingestion_lambda_timeout_seconds = 10
+
+# 동시 이벤트를 처리하되 Lambda가 5개를 넘어 확장되지 않도록 제한한다.
+ingestion_lambda_reserved_concurrency = 5
