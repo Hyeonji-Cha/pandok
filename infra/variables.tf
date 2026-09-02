@@ -60,3 +60,31 @@ variable "bronze_retention_days" {
     error_message = "데이터 보관 기간은 1일 이상 365일 이하여야 합니다."
   }
 }
+
+variable "enable_streaming" {
+  description = "Kinesis 기반 실시간 수집 리소스 생성 여부"
+  type        = bool
+
+  # 작업하지 않을 때 시간당 비용이 발생하는 스트림을 제거하도록 기본값을 끈다.
+  default  = false
+  nullable = false
+}
+
+variable "kinesis_shard_count" {
+  description = "Kinesis Provisioned 모드에서 사용할 shard 수"
+  type        = number
+
+  # 개인 프로젝트의 낮은 처리량에는 shard 1개로 시작한다.
+  default  = 1
+  nullable = false
+
+  # 설정 실수로 사용량보다 많은 shard가 생성되어 고정 비용이 커지는 것을 막는다.
+  validation {
+    condition = (
+      floor(var.kinesis_shard_count) == var.kinesis_shard_count &&
+      var.kinesis_shard_count >= 1 &&
+      var.kinesis_shard_count <= 2
+    )
+    error_message = "Kinesis shard 수는 1~2 사이의 정수여야 합니다."
+  }
+}

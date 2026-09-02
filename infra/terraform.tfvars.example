@@ -11,3 +11,9 @@ aws_region = "ap-southeast-2"
 
 # Bronze 테스트 데이터는 생성 후 최대 30일까지만 보관한다.
 bronze_retention_days = 30
+
+# 평소에는 유료 스트리밍 리소스를 만들지 않고 실제 연결 시험 때만 true로 바꾼다.
+enable_streaming = false
+
+# 개인 프로젝트의 예상 처리량에는 Provisioned shard 1개만 사용한다.
+kinesis_shard_count = 1
