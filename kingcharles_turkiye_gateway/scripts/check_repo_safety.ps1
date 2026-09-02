@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-$Repo = "$env:USERPROFILE\Desktop\pandok"
+# Resolve the repository root from this script's location so it works on any machine.
+$Repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $Target = Join-Path $Repo "kingcharles_turkiye_gateway"
 
 if (-not (Test-Path (Join-Path $Repo ".git"))) {
