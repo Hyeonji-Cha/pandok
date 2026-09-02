@@ -19,7 +19,7 @@ def test_ingest_json_accepts_valid_json(
 
     record = ingest_json(
         json.dumps(valid_event),
-        "scenario_generator",
+        "turkiye_gateway",
         received_at=datetime(2026, 9, 1, 12, 30, tzinfo=UTC),
     )
 
@@ -34,7 +34,7 @@ def test_ingest_json_rejects_invalid_json() -> None:
     with pytest.raises(InvalidJsonError) as captured:
         ingest_json(
             '{"event_name": "run_started"',
-            "scenario_generator",
+            "turkiye_gateway",
         )
 
     assert captured.value.issues[0].code == ReasonCode.INVALID_JSON

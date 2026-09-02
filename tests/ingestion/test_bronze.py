@@ -1,3 +1,6 @@
+# Bronze 포장과 수집 채널 정책이 AWS 저장 전에 지켜지는지 테스트한다.
+# Türkiye Gateway 우회와 잘못된 source_type을 차단하기 위해 필요하다.
+
 from datetime import datetime, timezone
 
 import pytest
@@ -76,4 +79,25 @@ def test_build_bronze_record_rejects_naive_received_at() -> None:
             {"source_type": "CONTROLLED_SCENARIO"},
             "scenario_generator",
             received_at=datetime(2026, 9, 1, 12, 30),
+        )
+
+
+# 운영 데이터는 Türkiye Gateway만 AWS Bronze에 전달할 수 있는지 확인한다.
+def test_production_ingestion_requires_turkiye_gateway() -> None:
+    record = build_bronze_record(
+        {"source_type": "CONSENTED_PROD_PLAY"},
+        "turkiye_gateway",
+    )
+
+    assert record["metadata"]["ingestion_channel"] == (
+        "turkiye_gateway"
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Unsupported ingestion_channel",
+    ):
+        build_bronze_record(
+            {"source_type": "CONSENTED_PROD_PLAY"},
+            "unity_client",
         )

@@ -1,6 +1,10 @@
-from typing import Any, Mapping
+# 검증된 v2 이벤트를 AWS Bronze 저장 형식으로 감싼다.
+# Türkiye Gateway를 거친 출처만 운영 데이터로 허용하기 위해 수집 채널도 함께 검사한다.
+
 from copy import deepcopy
 from datetime import datetime, timezone
+from typing import Any, Mapping
+
 
 def build_bronze_record(
     validated_event: Mapping[str, Any],
@@ -31,8 +35,9 @@ def build_bronze_record(
         },
     }
 
+
 ALLOWED_SOURCE_TYPES_BY_CHANNEL = {
-    "unity_client": frozenset(
+    "turkiye_gateway": frozenset(
         {
             "CONSENTED_PROD_PLAY",
             "CONTROLLED_SCENARIO",
@@ -53,6 +58,7 @@ def validate_ingestion_channel(ingestion_channel: str) -> None:
         raise ValueError(
             f"Unsupported ingestion_channel: {ingestion_channel}"
         )
+
 
 def validate_source_channel_pair(
     event: Mapping[str, Any],
