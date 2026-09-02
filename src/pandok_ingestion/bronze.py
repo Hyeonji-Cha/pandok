@@ -36,6 +36,26 @@ def build_bronze_record(
     }
 
 
+# Bronze 레코드를 Athena가 효율적으로 조회할 수 있는 S3 파티션 경로로 변환한다.
+# 날짜와 source_type으로 조회 범위를 줄여 불필요한 S3 스캔 비용을 막기 위해 필요하다.
+def build_bronze_partition_prefix(
+    bronze_record: Mapping[str, Any],
+) -> str:
+    event = bronze_record["event"]
+    metadata = bronze_record["metadata"]
+    # 클라이언트 시간이 아니라 AWS에서 기록한 수신 날짜를 파티션 기준으로 사용한다.
+    received_at = datetime.fromisoformat(
+        str(metadata["received_at"]).replace("Z", "+00:00")
+    )
+    received_date = received_at.date().isoformat()
+    # run_id와 event_id는 값이 너무 많아 파티션 수를 증가시키므로 경로에서 제외한다.
+    return (
+        "bronze/"
+        f"schema_version={event['schema_version']}/"
+        f"source_type={event['source_type']}/"
+        f"received_date={received_date}/"
+    )
+
 ALLOWED_SOURCE_TYPES_BY_CHANNEL = {
     "turkiye_gateway": frozenset(
         {

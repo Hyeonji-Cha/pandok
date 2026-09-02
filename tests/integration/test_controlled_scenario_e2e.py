@@ -22,7 +22,7 @@ def test_controlled_scenario_flows_to_bronze(
     bronze_records = [
         ingest_json(
             json.dumps(event),
-            "scenario_generator",
+            "turkiye_gateway",
             received_at=first_received_at + timedelta(seconds=index),
         )
         for index, event in enumerate(generated_events)
@@ -40,6 +40,6 @@ def test_controlled_scenario_flows_to_bronze(
         for record in bronze_records
     )
     assert all(
-        record["metadata"]["ingestion_channel"] == "scenario_generator"
+        record["metadata"]["ingestion_channel"] == "turkiye_gateway"
         for record in bronze_records
     )
