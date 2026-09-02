@@ -19,6 +19,7 @@ def test_lambda_handler_accepts_valid_event(
         "SequenceNumber": "12345",
     }
     monkeypatch.setenv("KINESIS_STREAM_NAME", "pandok-dev-telemetry")
+    monkeypatch.setenv("INGESTION_SHARED_SECRET", "test-secret-at-least-32-characters")
     monkeypatch.setattr(
         lambda_entrypoint,
         "_get_kinesis_client",
@@ -28,6 +29,11 @@ def test_lambda_handler_accepts_valid_event(
     response = lambda_entrypoint.lambda_handler(
         {
             "body": json.dumps(valid_event),
+            "headers": {
+                "x-pandok-ingestion-key": (
+                    "test-secret-at-least-32-characters"
+                ),
+            },
             "isBase64Encoded": False,
         },
         None,
@@ -38,3 +44,25 @@ def test_lambda_handler_accepts_valid_event(
     assert kinesis_client.put_record.call_args.kwargs[
         "PartitionKey"
     ] == valid_event["run_id"]
+
+
+# 공유 비밀값이 다르면 Lambda가 이벤트를 처리하거나 Kinesis를 호출하지 않는지 확인한다.
+def test_lambda_handler_rejects_invalid_secret(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("INGESTION_SHARED_SECRET", "test-secret-at-least-32-characters")
+
+    response = lambda_entrypoint.lambda_handler(
+        {
+            "body": "{}",
+            "headers": {"x-pandok-ingestion-key": "wrong-secret"},
+            "isBase64Encoded": False,
+        },
+        None,
+    )
+
+    assert response["statusCode"] == 401
+    assert json.loads(response["body"]) == {
+        "accepted": False,
+        "reason": "unauthorized",
+    }

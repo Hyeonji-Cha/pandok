@@ -2,6 +2,7 @@
 # Lambda가 요청 본문이나 개인정보를 로그·응답에 노출하지 않고 수집을 처리하기 위해 필요하다.
 
 import base64
+import hmac
 import json
 import os
 from binascii import Error as Base64DecodeError
@@ -13,6 +14,8 @@ from .pipeline import EventContractError
 
 
 _kinesis_client: KinesisClient | None = None
+_INGESTION_SECRET_HEADER = "x-pandok-ingestion-key"
+_MAX_REQUEST_BODY_BYTES = 64 * 1024
 
 
 def lambda_handler(
@@ -20,6 +23,12 @@ def lambda_handler(
     _context: Any,
 ) -> dict[str, Any]:
     """Handle one API Gateway HTTP API telemetry request."""
+    if not _is_authorized(event):
+        return _json_response(
+            401,
+            {"accepted": False, "reason": "unauthorized"},
+        )
+
     try:
         request_body = _decode_request_body(event)
 
@@ -53,9 +62,41 @@ def _decode_request_body(event: dict[str, Any]) -> str | bytes:
         raise ValueError("API Gateway request body is required")
 
     if event.get("isBase64Encoded") is True:
-        return base64.b64decode(body, validate=True)
+        decoded_body = base64.b64decode(body, validate=True)
+    else:
+        decoded_body = body
 
-    return body
+    body_size = len(
+        decoded_body.encode("utf-8")
+        if isinstance(decoded_body, str)
+        else decoded_body
+    )
+    if body_size > _MAX_REQUEST_BODY_BYTES:
+        raise ValueError("API Gateway request body is too large")
+
+    return decoded_body
+
+
+def _is_authorized(event: dict[str, Any]) -> bool:
+    """Compare the Türkiye Gateway secret without logging it."""
+    headers = event.get("headers")
+    if not isinstance(headers, dict):
+        return False
+
+    provided_secret = next(
+        (
+            value
+            for name, value in headers.items()
+            if str(name).lower() == _INGESTION_SECRET_HEADER
+            and isinstance(value, str)
+        ),
+        None,
+    )
+    if provided_secret is None:
+        return False
+
+    expected_secret = os.environ["INGESTION_SHARED_SECRET"]
+    return hmac.compare_digest(provided_secret, expected_secret)
 
 
 def _get_kinesis_client() -> KinesisClient:

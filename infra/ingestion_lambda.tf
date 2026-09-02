@@ -84,7 +84,8 @@ resource "aws_lambda_function" "ingestion" {
 
   environment {
     variables = {
-      KINESIS_STREAM_NAME = aws_kinesis_stream.telemetry[0].name
+      INGESTION_SHARED_SECRET = var.ingestion_shared_secret
+      KINESIS_STREAM_NAME     = aws_kinesis_stream.telemetry[0].name
     }
   }
 

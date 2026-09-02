@@ -26,3 +26,10 @@ ingestion_lambda_timeout_seconds = 10
 
 # 동시 이벤트를 처리하되 Lambda가 5개를 넘어 확장되지 않도록 제한한다.
 ingestion_lambda_reserved_concurrency = 5
+
+# 실제 비밀값은 개인 terraform.tfvars에서만 32자 이상으로 설정한다.
+ingestion_shared_secret = null
+
+# 지속 요청은 초당 20건, 순간 요청은 최대 40건을 목표로 제한한다.
+ingestion_api_rate_limit  = 20
+ingestion_api_burst_limit = 40
