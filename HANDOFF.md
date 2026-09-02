@@ -1,395 +1,237 @@
 # HANDOFF
 
-이 문서는 다른 데스크톱의 Codex가 PANDOK의 Privacy-by-Design 재설계를 중복 조사 없이 이어가기 위한 인수인계 문서다.
-현재 구현 상태, 확정된 결정, 미완료 작업, 개발자 의존사항과 작업 방식을 한곳에 기록한다.
+이 문서는 다른 데스크톱의 Codex가 PANDOK 작업을 중복 조사 없이 이어가기 위한 최신 인수인계 문서다.
+새 작업을 시작하기 전에 이 문서와 실제 `git status`, 최근 커밋을 함께 확인한다.
 
 ## 프로젝트 목표
 
-Steam 정식 게임 **King Charles: Rise of the Alpha**의 동의 기반 gameplay telemetry를 수집하고,
-중복·누락·지연 가능성이 있는 이벤트를 신뢰할 수 있는 Bronze, Silver, Gold 데이터로 변환해
-게임 개선 지표와 검증 가능한 LLM 리포트를 만드는 데이터 엔지니어링 프로젝트다.
+Steam 게임 **King Charles: Rise of the Alpha**의 익명 gameplay telemetry를 수집하고,
+신뢰할 수 있는 Bronze, Silver, Gold 데이터로 변환하는 개인 데이터 엔지니어링 프로젝트다.
 
-익명성 재설계 이후의 핵심 목표는 다음과 같다.
+사업용 서비스 구축이 아니라 데이터 수집·검증·스트리밍·분석 구조를 직접 학습하고 증명하는 것이 목적이다.
 
-> AWS Sydney와 한국 데이터 엔지니어가 접근하는 영역에는 플레이어를 직접 또는 간접적으로
-> 식별하거나 서로 다른 Run을 같은 플레이어의 것으로 연결할 수 있는 데이터를 보내지 않는다.
-
-이 설계가 KVKK 적용 제외를 보장한다고 단정하지 않는다. 실제 privacy 특성은 Unity 구현,
-Türkiye VPS 업체, 로그·백업 설정, 네트워크 경로와 향후 Schema 변경에 따라 다시 검토해야 한다.
-
-## 저장소와 현재 Git 상태
-
-- 실제 저장소: `C:\Users\NT551_11TH\Desktop\workspace\pandok`
-- GitHub: `https://github.com/Hyeonji-Cha/pandok.git`
-- 현재 브랜치: `main`
-- 마지막 Privacy 구현 커밋: `d2419a5 feat(privacy): expand anonymous telemetry field guards`
-- 이 문서는 바로 다음 `docs: add project handoff` 커밋으로 추가된다.
-- 다른 데스크톱에서는 실제 HEAD와 원격 동기화 상태를 `git status`와 `git log`로 다시 확인한다.
-
-정상이면 `git status`에서 다음과 유사하게 표시된다.
+## 공식 아키텍처
 
 ```text
-On branch main
-Your branch is up to date with 'origin/main'.
-nothing to commit, working tree clean
+Unity
+→ Türkiye Gateway
+→ 개인정보 제거·v2 Schema 검증·중복 처리
+→ AWS API Gateway HTTP API
+→ Lambda: 인증·JSON parsing·v2 재검증·Bronze wrapper
+→ Kinesis Data Streams
+→ Data Firehose
+→ S3 Bronze
+→ Silver Run 복원
+→ Gold 집계·분석
 ```
 
-## 최종 Privacy Architecture 기준
+- AWS Region은 Sydney `ap-southeast-2`다.
+- Managed Apache Flink는 현재 구성에 포함하지 않는다. 필요한 상태 기반 실시간 처리가 명확해질 때만 검토한다.
+- 데이터베이스는 초기 범위에 포함하지 않는다. S3, Glue, Athena 기반 데이터 레이크로 진행한다.
+- 로컬 Bronze writer와 Lambda 직접 S3 writer는 구현하지 않는다.
 
-```text
-King Charles Game Client
-        |
-        | HTTPS
-        v
-Türkiye Anonymization Gateway
-  Nginx TLS termination
-        |
-  FastAPI Privacy Gateway
-  - JSON Schema validation
-  - allowed-field reconstruction
-  - forbidden-field detection
-  - incoming-header removal
-  - new outbound request
+## 확정된 v2 데이터 계약
 
-======== PRIVACY BOUNDARY: IDENTIFIABLE DATA MUST NOT CROSS ========
-        |
-        v
-AWS Sydney (ap-southeast-2)
-  API Gateway
-        -> Lambda Privacy Validator
-        -> Kinesis Data Streams
-        -> Managed Apache Flink
-        -> Data Firehose
-        -> S3 Bronze
-        -> S3 Silver
-        -> Airflow
-        -> Gold aggregate metrics
-        -> LLM report
-```
+- AWS 입력 계약은 `contracts/telemetry-event-v2.schema.json` 하나만 사용한다.
+- v1 계약과 v1 validator 흔적은 제거했으며 다시 추가하지 않는다.
+- 유지 필드: `run_id`, `event_id`, `event_sequence`, `run_elapsed_seconds`.
+- `run_id`는 Run마다 새로 만들며 서로 다른 Run이나 player와 연결하지 않는다.
+- `event_id`는 논리 이벤트마다 새로 만들고 동일 이벤트 재전송에서는 유지한다.
+- 사용자·계정·Session·IP·기기·설치 식별자와 정확한 client `event_time`은 AWS로 보내지 않는다.
+- `session_started`는 AWS로 보내지 않는다.
+- `event_sequence`로 Run 내부 순서를 복원하고 `run_elapsed_seconds`로 상대시간을 표현한다.
+- `source_type`은 `CONSENTED_PROD_PLAY`, `CONTROLLED_SCENARIO`, `LOAD_TEST`를 구분한다.
+- 운영 데이터는 `turkiye_gateway` ingestion channel만 허용한다.
+- `aggregate-export-v1`은 Türkiye Gateway의 선택적 대조 자료일 뿐 v2 이벤트를 대체하지 않는다.
 
-Game Client가 AWS Sydney에 직접 연결하는 경로와 Gateway 장애 시 AWS 직접 fallback은 금지한다.
-Gateway 장애가 gameplay를 중단해서도 안 된다.
+## Türkiye Gateway 상태와 책임
 
-## 현재까지 확정된 익명성 결정
-
-- `anonymous_user_id`를 v2에서 제거한다.
-- `session_id`를 v2에서 제거한다.
-- AWS-bound v2에서는 `session_started` 이벤트를 제거한다.
-- Steam ID, 닉네임, 계정·기기·설치·하드웨어 ID, IP, 인증정보와 영구 fingerprint를 수집하지 않는다.
-- 영구 UUID를 사용하지 않지만 UUID 자체를 전부 금지하지는 않는다.
-- `run_id`는 매 Run 시작 시 새 random UUID로 생성하고 다른 Run이나 player와 매핑하지 않는다.
-- `event_id`는 논리 이벤트마다 새 random UUID로 만들고 동일 이벤트 재전송에서는 그대로 유지한다.
-- `choice_id`는 한 Run 안의 shown/selected 연결에만 사용한다.
-- 서로 다른 Run이 같은 플레이어의 것인지 AWS에서 알아낼 수 없어야 한다.
-- 클라이언트의 정확한 wall-clock `event_time`은 v2 payload에서 제거한다.
-- `event_sequence`는 Run 내부 논리 순서를 표현한다.
-- `run_elapsed_seconds`는 Run 내부 gameplay 상대시간을 표현한다.
-- Gateway 수신시간은 client payload와 분리된 운영 metadata로 다루며 필요한 최소 정밀도와 보존기간을 추후 확정한다.
-- Product 데이터의 정확한 시각 분석은 포기한다.
-- 정확한 Watermark·Late Event 재현은 `CONTROLLED_SCENARIO` 합성 데이터로 검증할 수 있다.
-- Sequence 번호 공백은 Run 폐기 오류가 아니라 `INCOMPLETE` 상태로 처리한다.
-- 같은 Sequence 번호에 서로 다른 이벤트가 있으면 `INVALID`다.
-- `run_elapsed_seconds`는 감소할 수 없지만 서로 같은 값은 허용한다.
-- Initial weapon shown/selected는 `run_started`보다 앞설 수 있으며 모두 elapsed 0을 사용한다.
-- 실제 사용자 데이터는 `CONSENTED_PROD_PLAY`, 기능 검증은 `CONTROLLED_SCENARIO`, 부하는 `LOAD_TEST`로 분리한다.
-- Gold와 LLM 입력에는 실제 제품 분석용 집계만 전달하며 개별 player 추적을 만들지 않는다.
-- AWS telemetry 보존 상한 기본값은 30일이다.
-
-## 의도적으로 포기한 분석
-
-- 동일 player의 장기 행동 추적
-- 개인별 retention과 재방문 분석
-- 특정 사용자의 history
-- user-level cross-Run 분석
-- 특정 사용자의 과거 Run 검색과 개별 삭제
-- 실제 사용자별 DAU 계산
-- 정확한 실제 플레이 시각과 시간대별 이용 패턴
-
-## 계속 유지하는 분석
-
-- Run duration과 survival time
-- death timing, cause, level
-- kill, XP, HP, gold progression
-- upgrade shown, selected, pick rate, level, rarity, combination
-- pickup과 enemy/miniboss encounter
-- checkpoint 누락과 Run 완전성
-- 문제 gameplay 구간과 balance anomaly
-- Gold 집계 지표와 근거 기반 LLM 개선안
-
-## Türkiye Gateway 필수 조건
-
-Türkiye VPS는 데이터 엔지니어가 대신 만들거나 소유하지 않는다. 게임 운영자인 개발자가 직접
-업체를 선택하고 자기 계정으로 서버를 생성하며 계약·결제·소유권을 관리한다.
-
-VPS와 Gateway 요구사항:
-
-- 실제 물리 서버 위치: Türkiye
-- 업체의 로그·백업·subprocessor 저장 위치 확인
-- Nginx access log: 기본 `OFF` 또는 개인정보 없는 최소 형식
-- Request body logging: `OFF`
-- Player IP application log: `OFF`
-- IP 보관이 보안상 불가피하면 Türkiye 내부에서 최소 기간만 보관하고 gameplay event와 연결 금지
-- 불필요한 backup/snapshot: `OFF`
-- 외부 Analytics/APM: 기본 `OFF`
-- 해외 CDN 또는 client traffic proxy: 사용하지 않음
-- `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`를 AWS로 전달하지 않음
-- Incoming request를 그대로 proxy하지 않고 허용된 payload와 header로 새로운 outbound request 생성
-- AWS에서 보이는 source network identity는 player가 아니라 Türkiye Gateway여야 함
-- Game Client에 AWS endpoint나 AWS credential을 넣지 않음
-
-## 역할 분담
-
-| 작업 | 담당 |
-|---|---|
-| Unity/Game telemetry event 생성과 전송 제어 | 게임 개발자 |
-| Türkiye VPS 업체·계정·서버·비용 관리 | 게임 개발자 |
-| Game에 Türkiye Gateway endpoint 연결 | 게임 개발자 + 데이터 엔지니어 |
-| Nginx와 FastAPI Privacy Gateway 구현 | 데이터 엔지니어 |
-| 익명 Schema와 금지 필드 검사 | 데이터 엔지니어 |
-| AWS Sydney 수집 파이프라인과 2차 privacy validation | 데이터 엔지니어 |
-| 실제 Build의 동의·Queue·전송 검증 | 공동 |
-
-개발자 답변을 기다리는 항목:
-
-1. 요구조건을 만족하는 Türkiye VPS를 개발자 명의로 생성할 수 있는지
-2. 기존 PANDOK v1 Schema가 Unity에 어느 정도 구현됐는지
-3. 과거 요청한 `anonymous_user_id`와 `session_id`가 이미 구현됐다면 계정·기기 ID와 연결되는지
-4. 실제 게임의 content ID 허용 목록
-5. Game endpoint를 Türkiye Gateway 하나로 제한하고 direct AWS fallback을 끌 수 있는지
-
-개발자 답변을 기다리는 동안 합성 데이터, Schema, Validator, Gateway local test와 AWS mock은 계속 구현할 수 있다.
+- Türkiye VPS와 Gateway는 게임 개발자이자 운영자가 소유·관리한다.
+- 개발자가 VPS에서 게임 데이터가 들어오는 것까지 확인했다.
+- Unity가 AWS에 직접 연결하거나 Gateway 장애 시 AWS로 fallback하는 경로는 금지한다.
+- Gateway는 원본 header를 전달하지 않고 허용된 v2 payload로 새 AWS 요청을 만들어야 한다.
+- `X-Forwarded-For`, `Forwarded`, `X-Real-IP` 등 player IP header를 AWS로 전달하지 않는다.
+- access log, request body log, 외부 APM, 불필요한 backup은 끄거나 최소화한다.
+- AWS 배포 후 개발자에게 API endpoint와 공유 비밀값을 안전하게 전달해야 한다.
+- Gateway는 AWS 요청에 `X-Pandok-Ingestion-Key` header를 포함해야 한다.
 
 ## 구현 완료
 
-### v1 기존 기준
+### Python ingestion
 
-- JSON Schema Draft 2020-12 이벤트 계약
-- `session_started`, `upgrade_options_shown`, `upgrade_selected`, `run_started`, `run_checkpoint`, `run_ended`
-- 단일 이벤트와 전체 Run 순서 검증
-- `event_id` 중복·충돌 검증
-- shown/selected 연결과 checkpoint 검증
-- 개인정보 금지 필드 검사
-- CLI와 정상·오류 Fixture
-- v1 CONTROLLED_SCENARIO Generator
-- JSON ingestion handler, contract validation, Bronze wrapper
-- Generator → JSON → ingestion → Bronze local E2E test
+- `src/pandok_ingestion/pipeline.py`
+  - `validate_anonymous_event()`로 v2 계약과 개인정보 금지 규칙 검사.
+- `src/pandok_ingestion/bronze.py`
+  - 검증된 이벤트를 Bronze envelope로 포장.
+  - 운영 source와 ingestion channel 조합 검사.
+- `src/pandok_ingestion/handler.py`
+  - JSON 문자열을 Python 객체로 파싱.
+  - 파싱 → 검증 → Bronze → Kinesis 흐름 연결.
+- `src/pandok_ingestion/kinesis_producer.py`
+  - Bronze JSON을 UTF-8 newline-delimited record로 직렬화.
+  - `run_id`를 Kinesis Partition Key로 사용.
+- `src/pandok_ingestion/lambda_entrypoint.py`
+  - API Gateway HTTP API payload 2.0 처리.
+  - 공유 비밀값을 `hmac.compare_digest()`로 검사.
+  - request body를 64 KiB로 제한.
+  - 정상 요청은 `202`, 인증 실패는 `401`, 잘못된 telemetry는 `400` 반환.
+  - 요청 본문이나 비밀값을 로그·응답에 기록하지 않음.
 
-v1은 비교와 회귀 검증을 위해 유지한다. v2 확정 전 임의 삭제하지 않는다.
+### Terraform infrastructure
 
-### Privacy 설계 문서
+- `infra/storage_s3.tf`
+  - 비공개 S3 Bronze bucket, SSE-S3, HTTPS-only policy.
+  - Bronze 객체 30일 후 삭제, incomplete multipart upload 7일 후 삭제.
+- `infra/streaming_kinesis.tf`
+  - Provisioned Kinesis, 기본 shard 1개, 보존 24시간, AWS 관리형 KMS 키.
+- `infra/streaming_firehose.tf`
+  - Kinesis source → S3 Bronze.
+  - 5 MiB 또는 300초 buffer, GZIP 압축.
+  - `bronze/received_date=YYYY-MM-DD/` 저장.
+  - Firehose 전용 최소 IAM 권한을 같은 파일에서 관리.
+- `infra/ingestion_lambda.tf`
+  - Python 3.12 Lambda와 전용 IAM.
+  - 메모리 256 MB, timeout 10초, 예약 동시 실행 기본 5.
+  - CloudWatch log retention 7일.
+- `infra/ingestion_api.tf`
+  - 저비용 HTTP API와 `POST /telemetry/v2` 단일 route.
+  - payload format 2.0, access log와 detailed metric 비활성.
+  - 기본 rate 20 requests/sec, burst 40.
+  - API Gateway의 route는 `authorization_type = NONE`이지만 Lambda에서 공유 비밀값을 검사한다.
+- `scripts/build_lambda_package.ps1`
+  - Windows에서 Python 3.12 Linux x86_64 Lambda ZIP 생성.
+  - 출력은 `build/pandok-ingestion-lambda.zip`이며 Git에서 제외된다.
 
-- `docs/privacy-by-design.md`: 활성 개인정보 경계와 재설계 단계
-- `docs/privacy-field-review.md`: 모든 현재 필드의 `KEEP / MODIFY / REMOVE` 분류
-- `docs/privacy-threat-model.md`: 식별 위험, 차단 방법, 검증 테스트와 잔여 위험
-- `docs/architecture.md`: 기존 direct Steam-to-AWS 흐름은 구현 금지라는 경고가 상단에 있음
+## 비용 제어 기준
 
-### v2 익명 계약
+- `enable_streaming` 기본값은 `false`다.
+- `false`에서는 Kinesis, Firehose, Lambda, API Gateway와 관련 IAM·로그 그룹을 만들지 않는다.
+- `true`는 짧은 AWS 통합 시험 동안만 사용한다.
+- Kinesis shard는 기본 1, validation 상한 2다.
+- Lambda 메모리는 128/256/512 MB만 허용하며 기본 256 MB다.
+- Lambda timeout은 3~15초만 허용하며 기본 10초다.
+- Lambda 예약 동시 실행은 기본 5, 상한 10이다. 예약 설정 자체에는 유휴 실행 비용이 없다.
+- API Gateway throttle은 비용의 절대 상한이 아니라 best-effort 보호 장치다.
+- NAT Gateway, MWAA, OpenSearch, RDS와 고객 관리 KMS 키는 현재 사용하지 않는다.
+- 작업 종료 후 `enable_streaming=false`로 적용해 시간당 비용이 있는 스트리밍 리소스를 제거한다.
 
-- `contracts/telemetry-event-v2.schema.json`
-- v2에서는 다섯 Run 이벤트만 지원하고 `session_started`는 제외
-- 공통 필드:
-  - `event_id`
-  - `event_name`
-  - `source_type`
-  - `run_id`
-  - `event_sequence`
-  - `run_elapsed_seconds`
-  - `game_version`
-  - `schema_version = 2.0`
-- `anonymous_user_id`, `session_id`, `event_time`이 들어오면 거부
-- 콘텐츠 문자열 길이와 upgrade 배열 크기 제한
-- 정상 Run과 privacy-invalid Fixture 추가
+## 비밀값과 로컬 파일
 
-### v2 Validator
+- `infra/terraform.tfvars`에 32바이트 Base64 공유 비밀값이 설정되어 있다.
+- 현재 데스크톱에서는 형식과 Git 제외를 확인했다.
+- `terraform.tfvars`와 Terraform state는 Git에 올리지 않는다.
+- 다른 데스크톱으로 Git만 이동하면 이 파일은 따라가지 않는다.
+- 새 데스크톱에서는 새 비밀값을 생성하거나 기존 값을 별도의 안전한 방법으로 전달해야 한다.
+- 비밀값을 채팅, 문서, 커밋, 명령 출력에 노출하지 않는다.
+- 개발자에게는 API endpoint와 비밀값을 서로 분리된 안전한 채널로 전달한다.
 
-- `validate_anonymous_event()` 구현
-- `validate_anonymous_sequence()` 구현
-- `SequenceStatus`: `VALID`, `INCOMPLETE`, `INVALID`
-- 도착 순서와 관계없이 `event_sequence`로 재구성
-- 동일 재시도 허용
-- Sequence 공백과 `run_ended` 미도착은 `INCOMPLETE`
-- Sequence 충돌, elapsed 감소, Run 상관관계 불일치, 종료 이후 이벤트는 `INVALID`
-- 기존 v1 `validate_event()`와 `validate_sequence()`는 유지
+## 현재 검증 상태
 
-### Terraform과 S3
-
-- Terraform은 `infra/` 바로 아래에 구성하며 중복 하위 Terraform 폴더를 만들지 않는다.
-- AWS Region은 Sydney `ap-southeast-2`로 validation되어 있다.
-- `bronze_retention_days` 기본값은 30일이다.
-- `infra/storage_s3.tf`에 다음 구성이 커밋되어 있다.
-  - Bronze S3 bucket prefix
-  - dev에서만 `force_destroy`
-  - Public Access Block
-  - `BucketOwnerEnforced`
-  - 추가 KMS 비용이 없는 SSE-S3 `AES256`
-  - 30일 lifecycle과 7일 incomplete multipart cleanup
-  - HTTPS-only bucket policy
-- `terraform init`, `fmt`, `validate`는 이전에 통과했다.
-- 아직 `terraform apply`는 하지 않았다.
-- Privacy Architecture가 확정될 때까지 Terraform 리소스 확장을 중단한다.
-
-## 마지막 완료 작업
-
-마지막 완료 작업은 **v2 개인정보 금지 필드 확장**이다.
-
-변경 파일:
-
-- `src/pandok_contracts/validator.py`
-  - v1 금지 목록을 그대로 보존
-  - v2 전용 금지 목록 추가
-  - 계정·기기·설치·네트워크·인증·위치·영구 ID 관련 키 차단
-  - snake_case, camelCase, 대소문자와 구분자 차이를 정규화
-  - 중첩 객체와 배열을 재귀 검사
-- `tests/contract/test_privacy_rules.py`
-  - 27개 금지 키 표기 변형 테스트
-  - 중첩 field 테스트
-  - `player_level`, `run_id`, `event_sequence` 과잉 차단 방지
-  - 일반 미승인 필드는 `schema_invalid`로 구분
-  - v1 `session_id` 회귀 방지
-
-마지막 실행 결과:
+2026-09-02 기준:
 
 ```text
-Privacy/v2 tests: 51 passed
-Full test suite:   158 passed
-```
-
-재검증 명령:
-
-```powershell
-uv run pytest tests/contract/test_privacy_rules.py tests/contract/test_anonymous_event_contract_v2.py -q
 uv run pytest -q
+75 passed in 4.71s
+
+terraform fmt -check
+통과
+
+terraform validate
+Success! The configuration is valid.
+
+terraform plan -var="enable_streaming=true"
+Plan: 19 to add, 0 to change, 0 to destroy
 ```
 
-정상이면 각각 `51 passed`, 전체 `158 passed`가 예상된다. 테스트 수는 이후 테스트가 추가되면 증가할 수 있다.
+Terraform plan에서 공유 비밀값은 `(sensitive value)`로 가려지는 것을 확인했다.
+아직 `terraform apply`는 실행하지 않았고 AWS 리소스 및 비용은 생성되지 않았다.
 
 ## 다음 작업
 
-### 1. v2 CONTROLLED_SCENARIO Generator
+### 1. 새 데스크톱 준비
 
-개발자 데이터 없이 다음 파이프라인 작업을 검증하기 위한 첫 구현이다.
-
-- 기존 `src/pandok_producer/generator.py`와 `tests/producer/test_generator.py`를 재사용한다.
-- 새 Python 파일을 만들지 않는다.
-- v1 Generator는 유지한다.
-- v2 Generator는 다음만 새로 생성한다.
-  - Run마다 새 `run_id`
-  - 이벤트마다 새 `event_id`
-  - choice마다 새 `choice_id`
-- `event_sequence`, `run_elapsed_seconds`, gameplay 값은 검증된 template 의미를 유지한다.
-- `anonymous_user_id`, `session_id`, client `event_time`을 생성하지 않는다.
-- 생성 직후 `validate_anonymous_sequence()` 결과가 `VALID`인지 확인한다.
-- retry fixture는 동일 `event_id`, `event_sequence`, payload를 유지한다.
-
-### 2. v2 Ingestion과 Bronze envelope
-
-- 기존 handler/pipeline/bronze 파일을 재사용한다.
-- v2 payload를 `validate_anonymous_event()`로 검증한다.
-- Production ingestion channel을 `unity_client` 직접 경로가 아니라 인증된 `turkiye_gateway`로 변경한다.
-- Bronze는 두 privacy gate를 통과한 익명 이벤트만 저장한다.
-- `metadata.received_at`의 정밀도·용도·30일 보존을 명시적으로 결정한다.
-- v1 local tests는 유지한다.
-
-### 3. Türkiye Gateway local implementation
-
-- 개발자가 VPS를 만들기 전까지 로컬 FastAPI로 구현·테스트한다.
-- Pydantic/JSON Schema allow-list validation
-- unknown field와 forbidden field fail-closed 차단
-- 원본 request/header forwarding 금지
-- 허용 payload로 새 outbound request 생성
-- AWS endpoint 대신 mock receiver 사용
-- IP, body, auth token을 로그에 남기지 않음
-
-### 4. Gateway Privacy Tests
-
-- `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP` 제거
-- raw headers와 request body가 outbound/log에 없음
-- privacy-invalid 요청은 outbound 호출 0회
-- valid v2 요청만 새 outbound payload로 전달
-
-### 5. Lambda Privacy Validator local implementation
-
-- Gateway와 독립된 2차 v2 Schema/forbidden-field 검증
-- invalid 요청은 Kinesis write 0회
-- valid 요청만 mock Kinesis에 기록
-- raw request/event logging 금지
-
-### 6. Local anonymous E2E
-
-```text
-v2 Generator
-→ FastAPI Privacy Gateway
-→ Lambda Privacy Validator
-→ mock Kinesis
-→ anonymous Bronze record
+```powershell
+git pull
+uv sync
+& .\scripts\build_lambda_package.ps1
 ```
 
-### 7. Architecture 승인 후 Terraform 재개
+- `infra/terraform.tfvars`의 공유 비밀값을 새로 설정하거나 안전하게 이전한다.
+- 정상 빌드 결과는 `build\pandok-ingestion-lambda.zip`이다.
 
-- API Gateway authentication 방식
-- Secrets/SSM 사용 여부
-- throttling, Lambda concurrency, CloudWatch retention
-- Kinesis/Flink/Firehose/S3 경로
-- 모든 리소스에 비용 기본값과 상한 validation 적용
-- AWS 리소스 생성 전 비용과 삭제 방법 설명
+### 2. 배포 직전 계획 재확인
 
-## 현재 알려진 미완료 또는 불일치
+```powershell
+terraform -chdir=infra init
+terraform -chdir=infra plan -var="enable_streaming=true"
+```
 
-- CLI는 아직 v1 `validate-event`와 `validate-sequence`만 사용한다.
-- v2 Validator는 Python API로 구현됐지만 CLI version routing은 아직 없다.
-- 기존 ingestion과 Bronze wrapper는 아직 v1 검증을 사용한다.
-- 기존 v1 Generator는 `anonymous_user_id`, `session_id`, `event_time`을 생성한다.
-- 일반 game content ID는 아직 실제 allow-list가 없고 길이·문자 패턴만 제한한다.
-- `metadata.received_at`은 현재 millisecond 정밀도다.
-- README의 Supported P0 events 표는 v1 여섯 이벤트를 보여주며 v2 다섯 이벤트 구분을 아직 추가하지 않았다.
-- `docs/architecture.md` 본문에는 이전 direct flow가 남아 있지만 상단에 구현 금지 경고가 있다.
-- Türkiye VPS provider와 Gateway-to-AWS 인증 방식은 미확정이다.
-- 실제 Unity payload와 네트워크 evidence는 개발자 작업 대기 상태다.
+정상 예상 결과는 `19 to add, 0 to change, 0 to destroy`다.
 
-## 비용 및 AWS 원칙
+### 3. 짧은 AWS 통합 시험
 
-- AWS Region: `ap-southeast-2`
-- 운영 확장 가능한 구조를 유지하되 dev 기본값은 저비용이어야 한다.
-- Terraform validation으로 과도한 설정을 배포 전에 막는다.
-- S3 lifecycle, CloudWatch retention, 실패 레코드 보존기간을 명시한다.
-- Lambda reserved concurrency, API throttling, Kinesis mode와 로그량에 상한을 둔다.
-- NAT Gateway, MWAA와 기타 고정비가 큰 서비스는 설명과 승인 없이 생성하지 않는다.
-- AWS Budget은 비용 감시 수단이며 실시간 결제 차단 장치로 설명하지 않는다.
-- 실제 가격은 구현 시점의 Sydney 공식 요금을 다시 확인한다.
-- Commit 또는 Terraform code가 존재한다고 AWS 리소스가 생성된 것은 아니다. `apply` 여부를 반드시 확인한다.
+사용자 확인 후에만 다음 apply를 실행한다.
 
-## 작업 방식과 사용자 선호
+```powershell
+terraform -chdir=infra apply -var="enable_streaming=true"
+```
 
-- 사용자가 명시적으로 **“수정”**이라고 말할 때만 Codex가 파일을 수정한다.
-- 사용자가 “시작하자”, “해줘”, “가자”, “다음”이라고만 하면 다음 한 작업의 계획과 이유를 설명한다.
-- 한 번에 한 작업만 진행한다.
-- 사용자가 학습해야 하는 핵심 구현은 먼저 설명하고, 반복 작업은 Codex가 수행 범위를 알린 뒤 처리한다.
-- 명령어를 줄 때 명령의 역할과 정상 결과를 함께 설명한다.
-- Windows PowerShell 명령을 사용한다.
-- 이 환경에는 `rg`가 없으므로 확인 명령에 `rg`를 제시하지 않는다. `Get-ChildItem`, `Select-String`, `Get-Content`를 사용한다.
-- 새 파일 맨 앞에는 파일 역할과 필요한 이유를 이해하기 쉬운 한국어 주석으로 남긴다. JSON은 주석 문법이 없으므로 `$comment`를 사용한다.
-- 개발자와 공유하는 계약 설명·문서는 영어를 우선하고, 사용자 학습용 코드 역할 주석은 한국어를 사용한다.
-- 함수마다 모든 줄을 설명하지 말고 역할과 핵심 결정만 한국어 주석으로 남긴다.
-- 파일 증식을 피하고 기존 파일을 재사용할 수 있으면 재사용한다.
-- 테스트 파일은 경계가 명확히 다른 경우에만 새로 만들고 기존 테스트에 추가할 수 있으면 추가한다.
-- 기존 사용자 변경과 dirty worktree를 보존한다.
-- Commit과 push는 사용자가 요청할 때만 실행한다.
-- 적절한 commit 시점과 권장 commit message를 작업 완료 시 알려준다.
-- 개인정보·법률 문제에 대해 “아무 문제 없다”, “KVKK 제외 확정”처럼 단정하지 않는다.
+검증 순서:
 
-## 주요 문서
+1. Terraform output의 `ingestion_api_endpoint` 확인.
+2. 잘못된 공유 비밀값 요청이 `401`인지 확인.
+3. `CONTROLLED_SCENARIO` 이벤트 1건을 올바른 비밀값으로 보내 `202` 확인.
+4. 최대 5분 이상 기다린 뒤 S3 `bronze/received_date=.../`의 GZIP 객체 확인.
+5. GZIP JSON을 읽어 v2 event, Bronze metadata, `turkiye_gateway` channel 확인.
 
-- `README.md`
-- `docs/privacy-by-design.md`
-- `docs/privacy-field-review.md`
-- `docs/privacy-threat-model.md`
-- `docs/architecture.md`
-- `docs/project-scope.md`
-- `docs/event-contract.md`
-- `docs/event-data-model.md`
-- `docs/unity-telemetry-integration-plan.md`
-- `contracts/telemetry-event-v1.schema.json`
-- `contracts/telemetry-event-v2.schema.json`
+### 4. 시험 종료 후 비용 중단
 
-새 데스크톱의 Codex는 먼저 `HANDOFF.md`, `git status`, 최근 commit, 위 Privacy 문서와 v2 Schema를 읽고
-현재 상태를 확인한 다음 작업해야 한다. 과거의 direct Game-to-AWS 구조를 활성 설계로 오해하지 말아야 한다.
+```powershell
+terraform -chdir=infra apply -var="enable_streaming=false"
+```
+
+- 실행 전 plan에서 Kinesis, Firehose, Lambda, API Gateway 관련 리소스가 제거되고 S3는 유지되는지 확인한다.
+- 중요한 데이터가 생긴 뒤에는 S3 삭제 여부를 별도로 검토한다.
+
+### 5. 데이터 레이크 다음 단계
+
+- 실제 AWS 수집 경로 확인 후 Silver Run 복원 구현.
+- `event_sequence` 중복·공백·충돌을 반영해 `VALID`, `INCOMPLETE`, `INVALID` 상태 생성.
+- Glue Catalog와 Athena table은 실제 S3 객체 구조를 확인한 뒤 추가.
+- Gold 집계는 Silver 계약이 안정된 후 구현.
+
+## 커밋에서 제외할 사용자 파일
+
+- `infra/terraform.tfvars`
+- `build/` 전체
+- Terraform state와 `.terraform/`
+- 현재 untracked 상태인 `docs/6조_판독_데이터파이프라인_기획서.md`
+
+마지막 프로젝트 기획서는 이번 API Gateway/HANDOFF 커밋에 포함하지 않는다.
+
+## 작업 방식
+
+- 사용자는 현재 일정상 Codex가 먼저 구현하고, 이후 로직·개념을 읽고 검수하는 방식을 선택했다.
+- 한 번에 한 작업만 진행하고 변경 후 데이터 엔지니어 관점의 핵심 개념을 설명한다.
+- 반복적인 테스트·설정 정리는 Codex가 수행한다.
+- 명령에는 역할과 정상 예상 결과를 함께 설명한다.
+- Windows PowerShell을 사용하며 `rg` 대신 `Get-Content`, `Get-ChildItem`, `Select-String`을 사용한다.
+- 새 파일 앞에는 역할과 필요한 이유를 한국어 주석으로 남긴다.
+- 테스트는 중요한 경계만 추가하고 중복 테스트와 로컬 대체 구현을 만들지 않는다.
+- 사용자 변경과 dirty worktree를 보존한다.
+- 개인정보나 KVKK 적용 여부를 법적 확정처럼 단정하지 않는다.
+
+## 시작 시 읽을 파일
+
+1. `HANDOFF.md`
+2. `contracts/telemetry-event-v2.schema.json`
+3. `src/pandok_ingestion/lambda_entrypoint.py`
+4. `src/pandok_ingestion/handler.py`
+5. `src/pandok_ingestion/pipeline.py`
+6. `src/pandok_ingestion/bronze.py`
+7. `src/pandok_ingestion/kinesis_producer.py`
+8. `infra/ingestion_api.tf`
+9. `infra/ingestion_lambda.tf`
+10. `infra/streaming_kinesis.tf`
+11. `infra/streaming_firehose.tf`
+12. `infra/storage_s3.tf`
