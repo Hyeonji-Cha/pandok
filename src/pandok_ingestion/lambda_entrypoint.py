@@ -29,6 +29,13 @@ def lambda_handler(
             {"accepted": False, "reason": "unauthorized"},
         )
 
+    # endpoint는 유지하되 스트림이 없을 때 성공 응답으로 데이터 유실을 숨기지 않는다.
+    if not _streaming_is_enabled():
+        return _json_response(
+            503,
+            {"accepted": False, "reason": "streaming_disabled"},
+        )
+
     try:
         request_body = _decode_request_body(event)
 
@@ -110,6 +117,12 @@ def _get_kinesis_client() -> KinesisClient:
         _kinesis_client = boto3.client("kinesis")
 
     return _kinesis_client
+
+
+def _streaming_is_enabled() -> bool:
+    """Terraform이 전달한 스트리밍 활성화 상태를 엄격하게 확인한다."""
+
+    return os.environ.get("STREAMING_ENABLED", "false").lower() == "true"
 
 
 def _json_response(

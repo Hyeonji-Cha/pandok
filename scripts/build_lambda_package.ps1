@@ -14,6 +14,8 @@ $packageDirectory = Join-Path $buildRoot "lambda-package"
 $zipPath = Join-Path $buildRoot "pandok-ingestion-lambda.zip"
 $contractDirectory = Join-Path $packageDirectory "contracts"
 $contractPath = Join-Path $repositoryRoot "contracts\telemetry-event-v2.schema.json"
+$contractSource = Join-Path $repositoryRoot "src\pandok_contracts"
+$ingestionSource = Join-Path $repositoryRoot "src\pandok_ingestion"
 
 # 이전 빌드 파일이 새 패키지에 섞이지 않도록 저장소 내부 build 경로만 초기화한다.
 if (Test-Path -LiteralPath $packageDirectory) {
@@ -32,16 +34,21 @@ $pythonPlatform = if ($Architecture -eq "arm64") {
     "x86_64-manylinux_2_28"
 }
 
-# Lambda Python 3.12와 호환되는 Linux 패키지를 애플리케이션 코드와 함께 설치한다.
+# Lambda에서 실제로 사용하는 Schema 검증 의존성만 Linux 패키지로 설치한다.
+# Silver 전용 pyarrow와 런타임 기본 boto3를 제외해 직접 업로드 ZIP 한도를 지킨다.
 uv pip install `
     --target $packageDirectory `
     --python-version 3.12 `
     --python-platform $pythonPlatform `
-    $repositoryRoot
+    "jsonschema[format]>=4.23,<5"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Lambda package dependency installation failed."
 }
+
+# ingestion Lambda가 import하는 두 Python package만 배포 파일에 복사한다.
+Copy-Item -LiteralPath $contractSource -Destination $packageDirectory -Recurse
+Copy-Item -LiteralPath $ingestionSource -Destination $packageDirectory -Recurse
 
 # Validator가 Lambda 루트에서도 같은 실행 계약을 읽도록 v2 Schema를 함께 넣는다.
 New-Item -ItemType Directory -Path $contractDirectory -Force | Out-Null

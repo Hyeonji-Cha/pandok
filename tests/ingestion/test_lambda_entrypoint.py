@@ -19,6 +19,7 @@ def test_lambda_handler_accepts_valid_event(
         "SequenceNumber": "12345",
     }
     monkeypatch.setenv("KINESIS_STREAM_NAME", "pandok-dev-telemetry")
+    monkeypatch.setenv("STREAMING_ENABLED", "true")
     monkeypatch.setenv("INGESTION_SHARED_SECRET", "test-secret-at-least-32-characters")
     monkeypatch.setattr(
         lambda_entrypoint,
@@ -66,3 +67,40 @@ def test_lambda_handler_rejects_invalid_secret(
         "accepted": False,
         "reason": "unauthorized",
     }
+
+
+def test_lambda_handler_reports_disabled_streaming(
+    anonymous_sequence: list[dict[str, Any]],
+    monkeypatch: Any,
+) -> None:
+    kinesis_client = Mock()
+    monkeypatch.setenv(
+        "INGESTION_SHARED_SECRET",
+        "test-secret-at-least-32-characters",
+    )
+    monkeypatch.setenv("STREAMING_ENABLED", "false")
+    monkeypatch.setattr(
+        lambda_entrypoint,
+        "_get_kinesis_client",
+        lambda: kinesis_client,
+    )
+
+    response = lambda_entrypoint.lambda_handler(
+        {
+            "body": json.dumps(anonymous_sequence[0]),
+            "headers": {
+                "x-pandok-ingestion-key": (
+                    "test-secret-at-least-32-characters"
+                ),
+            },
+            "isBase64Encoded": False,
+        },
+        None,
+    )
+
+    assert response["statusCode"] == 503
+    assert json.loads(response["body"]) == {
+        "accepted": False,
+        "reason": "streaming_disabled",
+    }
+    kinesis_client.put_record.assert_not_called()

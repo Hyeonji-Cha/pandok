@@ -12,16 +12,13 @@ output "firehose_delivery_stream_name" {
 }
 
 output "ingestion_lambda_function_name" {
-  description = "활성화된 PANDOK ingestion Lambda 함수 이름"
-  value       = try(aws_lambda_function.ingestion[0].function_name, null)
+  description = "항상 유지되는 PANDOK ingestion Lambda 함수 이름"
+  value       = aws_lambda_function.ingestion.function_name
 }
 
 output "ingestion_api_endpoint" {
   description = "Türkiye Gateway가 호출할 PANDOK telemetry v2 HTTPS endpoint"
-  value = try(
-    "${aws_apigatewayv2_api.ingestion[0].api_endpoint}/telemetry/v2",
-    null,
-  )
+  value       = "${aws_apigatewayv2_api.ingestion.api_endpoint}/telemetry/v2"
 }
 
 output "silver_bucket_name" {

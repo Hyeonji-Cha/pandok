@@ -79,7 +79,7 @@ variable "silver_retention_days" {
 }
 
 variable "enable_streaming" {
-  description = "Kinesis 기반 실시간 수집 리소스 생성 여부"
+  description = "Kinesis와 Firehose 실시간 스트리밍 리소스 생성 여부"
   type        = bool
 
   # 작업하지 않을 때 시간당 비용이 발생하는 스트림을 제거하도록 기본값을 끈다.
@@ -171,11 +171,8 @@ variable "ingestion_shared_secret" {
   sensitive = true
 
   validation {
-    condition = (
-      !var.enable_streaming ||
-      try(length(var.ingestion_shared_secret) >= 32, false)
-    )
-    error_message = "스트리밍 활성화 시 32자 이상의 ingestion_shared_secret이 필요합니다."
+    condition     = try(length(var.ingestion_shared_secret) >= 32, false)
+    error_message = "항상 유지되는 ingestion API에는 32자 이상의 ingestion_shared_secret이 필요합니다."
   }
 }
 
