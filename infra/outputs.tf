@@ -39,6 +39,11 @@ output "silver_glue_table_name" {
   value       = aws_glue_catalog_table.silver_events.name
 }
 
+output "quarantine_glue_table_name" {
+  description = "INVALID Run을 조회하는 Glue 테이블 이름"
+  value       = aws_glue_catalog_table.quarantine_events.name
+}
+
 output "athena_workgroup_name" {
   description = "비용 제한이 적용된 PANDOK Athena Workgroup 이름"
   value       = aws_athena_workgroup.pandok.name
