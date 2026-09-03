@@ -23,3 +23,8 @@ output "ingestion_api_endpoint" {
     null,
   )
 }
+
+output "silver_bucket_name" {
+  description = "Silver Parquet 데이터를 저장하는 S3 버킷 이름"
+  value       = aws_s3_bucket.silver.id
+}

@@ -61,6 +61,23 @@ variable "bronze_retention_days" {
   }
 }
 
+variable "silver_retention_days" {
+  description = "Silver Parquet 데이터를 AWS에 보관하는 기간"
+  type        = number
+
+  # Silver도 승인된 최대 보관 기간인 30일을 넘지 않게 한다.
+  default  = 30
+  nullable = false
+
+  validation {
+    condition = (
+      var.silver_retention_days >= 1 &&
+      var.silver_retention_days <= 30
+    )
+    error_message = "Silver 보관 기간은 1일 이상 30일 이하여야 합니다."
+  }
+}
+
 variable "enable_streaming" {
   description = "Kinesis 기반 실시간 수집 리소스 생성 여부"
   type        = bool

@@ -33,3 +33,6 @@ ingestion_shared_secret = null
 # 지속 요청은 초당 20건, 순간 요청은 최대 40건을 목표로 제한한다.
 ingestion_api_rate_limit  = 20
 ingestion_api_burst_limit = 40
+
+# Silver Parquet도 생성 후 최대 30일까지만 보관한다.
+silver_retention_days = 30
