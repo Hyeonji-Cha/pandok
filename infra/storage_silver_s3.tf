@@ -42,11 +42,50 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "silver" {
 resource "aws_s3_bucket_lifecycle_configuration" "silver" {
   bucket = aws_s3_bucket.silver.id
 
+  # Plain Parquet staging은 설정된 보관 기간 후 자동 삭제한다.
   rule {
-    id     = "expire-silver-data"
+    id     = "expire-silver-staging"
     status = "Enabled"
 
-    filter {}
+    filter {
+      prefix = "silver/"
+    }
+
+    expiration {
+      days = var.silver_retention_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  # INVALID Run도 승인된 보관 기간을 넘기지 않게 한다.
+  rule {
+    id     = "expire-quarantine-data"
+    status = "Enabled"
+
+    filter {
+      prefix = "quarantine/"
+    }
+
+    expiration {
+      days = var.silver_retention_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  # Athena 쿼리 결과가 계속 누적되어 저장 비용을 만들지 않게 한다.
+  rule {
+    id     = "expire-athena-results"
+    status = "Enabled"
+
+    filter {
+      prefix = "athena-results/"
+    }
 
     expiration {
       days = var.silver_retention_days
