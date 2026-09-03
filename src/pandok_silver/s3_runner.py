@@ -11,7 +11,7 @@ from typing import Any
 
 import boto3
 
-from pandok_silver import reconstruct_runs, write_silver_parquet
+from pandok_silver import put_silver_parquet, reconstruct_runs
 
 
 def read_bronze_records(
@@ -37,33 +37,39 @@ def read_bronze_records(
 
 
 def main() -> None:
-    """S3 Bronze를 읽고 복원된 Silver Run 요약을 출력한다."""
+    """날짜별 S3 Bronze를 복원해 Silver Parquet로 저장한다."""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bucket", required=True)
-    parser.add_argument(
-        "--prefix",
-        default="bronze/",
-    )
-    parser.add_argument(
-        "--output",
-        required=True,
-        help="Silver Parquet file path",
-    )
+    parser.add_argument("--bronze-bucket", required=True)
+    parser.add_argument("--silver-bucket", required=True)
+    parser.add_argument("--received-date", required=True)
     arguments = parser.parse_args()
 
-    bronze_records = list(
-        read_bronze_records(arguments.bucket, arguments.prefix)
+    bronze_prefix = (
+        f"bronze/received_date={arguments.received_date}/"
     )
+    bronze_records = list(
+        read_bronze_records(arguments.bronze_bucket, bronze_prefix)
+    )
+    if not bronze_records:
+        raise SystemExit(
+            f"No Bronze records found under {bronze_prefix}"
+        )
+
     reconstructed_runs = reconstruct_runs(bronze_records)
-    output_path = write_silver_parquet(
+    s3_client = boto3.client("s3")
+    silver_key = put_silver_parquet(
         reconstructed_runs,
-        arguments.output,
+        arguments.silver_bucket,
+        arguments.received_date,
+        s3_client,
     )
 
     print(f"BRONZE_RECORDS={len(bronze_records)}")
     print(f"SILVER_RUNS={len(reconstructed_runs)}")
-    print(f"SILVER_OUTPUT={output_path}")
+    print(
+        f"SILVER_OUTPUT=s3://{arguments.silver_bucket}/{silver_key}"
+    )
 
     for run in reconstructed_runs:
         print(

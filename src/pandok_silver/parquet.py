@@ -125,3 +125,17 @@ def write_silver_parquet(
     )
     pq.write_table(table, output_path, compression="snappy")
     return output_path
+
+
+def write_silver_parquet_bytes(
+    runs: Iterable[ReconstructedRun],
+) -> bytes:
+    """로컬 임시 파일 없이 S3에 전송할 Parquet bytes를 만든다."""
+
+    table = pa.Table.from_pylist(
+        runs_to_silver_rows(runs),
+        schema=SILVER_EVENT_SCHEMA,
+    )
+    output = pa.BufferOutputStream()
+    pq.write_table(table, output, compression="snappy")
+    return output.getvalue().to_pybytes()

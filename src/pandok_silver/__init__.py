@@ -4,6 +4,7 @@ from .parquet import (
     SILVER_EVENT_SCHEMA,
     runs_to_silver_rows,
     write_silver_parquet,
+    write_silver_parquet_bytes,
 )
 from .run_reconstruction import (
     ReconstructedEvent,
@@ -11,13 +12,17 @@ from .run_reconstruction import (
     SilverInputError,
     reconstruct_runs,
 )
+from .s3_writer import build_silver_object_key, put_silver_parquet
 
 __all__ = [
     "ReconstructedEvent",
     "ReconstructedRun",
     "SILVER_EVENT_SCHEMA",
     "SilverInputError",
+    "build_silver_object_key",
+    "put_silver_parquet",
     "reconstruct_runs",
     "runs_to_silver_rows",
     "write_silver_parquet",
+    "write_silver_parquet_bytes",
 ]
