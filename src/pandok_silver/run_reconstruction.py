@@ -8,6 +8,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from pandok_contracts import (
@@ -23,18 +24,36 @@ class SilverInputError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class ReconstructedEvent:
+    """중복 제거된 이벤트와 최초 AWS 수신 정보를 함께 보관한다."""
+
+    event: dict[str, Any]
+    first_received_at: datetime
+    ingestion_channel: str
+
+
+@dataclass(frozen=True, slots=True)
 class ReconstructedRun:
     """Run 복원 결과와 품질 판정 근거를 함께 보관한다."""
 
     run_id: str
     source_type: str
     status: SequenceStatus
-    events: tuple[dict[str, Any], ...]
+    events: tuple[ReconstructedEvent, ...]
     issues: tuple[ValidationIssue, ...]
     input_event_count: int
     unique_event_count: int
     exact_retry_count: int
     conflicting_duplicate_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class _BronzeEvent:
+    """복원 중에 사용하는 단일 Bronze 이벤트와 수신 metadata다."""
+
+    event: dict[str, Any]
+    received_at: datetime
+    ingestion_channel: str
 
 
 def _canonical_event(event: Mapping[str, Any]) -> str:
@@ -51,8 +70,8 @@ def _canonical_event(event: Mapping[str, Any]) -> str:
 def _extract_event(
     bronze_record: Mapping[str, Any],
     record_index: int,
-) -> dict[str, Any]:
-    """Bronze wrapper에서 계약 검증 대상인 원본 이벤트를 꺼낸다."""
+) -> _BronzeEvent:
+    """Bronze wrapper에서 원본 이벤트와 수신 metadata를 꺼낸다."""
 
     if bronze_record.get("bronze_record_version") != 1:
         raise SilverInputError(
@@ -72,36 +91,85 @@ def _extract_event(
             f"Bronze record {record_index} has no Run or event ID"
         )
 
+    metadata = bronze_record.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise SilverInputError(
+            f"Bronze record {record_index} has no metadata object"
+        )
+
+    received_at_text = metadata.get("received_at")
+    ingestion_channel = metadata.get("ingestion_channel")
+    if not isinstance(received_at_text, str) or not isinstance(
+        ingestion_channel,
+        str,
+    ):
+        raise SilverInputError(
+            f"Bronze record {record_index} has invalid metadata"
+        )
+
+    try:
+        received_at = datetime.fromisoformat(
+            received_at_text.replace("Z", "+00:00")
+        )
+    except ValueError as error:
+        raise SilverInputError(
+            f"Bronze record {record_index} has invalid received_at"
+        ) from error
+    if received_at.tzinfo is None or received_at.utcoffset() is None:
+        raise SilverInputError(
+            f"Bronze record {record_index} has timezone-naive received_at"
+        )
+
     # 호출자가 보유한 Bronze 객체를 정렬·중복 제거 과정에서 변경하지 않는다.
-    return deepcopy(dict(event))
+    return _BronzeEvent(
+        event=deepcopy(dict(event)),
+        received_at=received_at.astimezone(timezone.utc),
+        ingestion_channel=ingestion_channel,
+    )
 
 
 def _deduplicate_run_events(
-    events: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], int, int]:
+    events: list[_BronzeEvent],
+) -> tuple[list[ReconstructedEvent], int, int]:
     """정상 retry와 본문 충돌을 구분하며 Silver 이벤트를 한 건씩 남긴다."""
 
-    seen: dict[str, str] = {}
-    unique: list[dict[str, Any]] = []
+    events_by_id: dict[str, list[_BronzeEvent]] = defaultdict(list)
+    for bronze_event in events:
+        events_by_id[str(bronze_event.event["event_id"])].append(
+            bronze_event
+        )
+
+    unique: list[ReconstructedEvent] = []
     exact_retry_count = 0
     conflicting_duplicate_count = 0
 
-    for event in events:
-        event_id = str(event["event_id"])
-        canonical = _canonical_event(event)
-        previous = seen.get(event_id)
+    for duplicates in events_by_id.values():
+        # S3 파일을 읽은 순서가 달라도 가장 이른 AWS 수신 기록을 동일하게 선택한다.
+        ordered = sorted(
+            duplicates,
+            key=lambda item: (
+                item.received_at,
+                _canonical_event(item.event),
+            ),
+        )
+        selected = ordered[0]
+        selected_canonical = _canonical_event(selected.event)
+        unique.append(
+            ReconstructedEvent(
+                event=selected.event,
+                first_received_at=selected.received_at,
+                ingestion_channel=selected.ingestion_channel,
+            )
+        )
 
-        if previous is None:
-            seen[event_id] = canonical
-            unique.append(event)
-        elif previous == canonical:
-            exact_retry_count += 1
-        else:
-            # 충돌 이벤트도 출력에서는 제거하지만 정상 retry와 별도 개수로 기록한다.
-            # INVALID 판정의 상세한 이유는 sequence validator가 issues에 보존한다.
-            conflicting_duplicate_count += 1
+        for duplicate in ordered[1:]:
+            if _canonical_event(duplicate.event) == selected_canonical:
+                exact_retry_count += 1
+            else:
+                # 충돌 이벤트도 출력에서는 제거하지만 정상 retry와 별도로 기록한다.
+                conflicting_duplicate_count += 1
 
-    unique.sort(key=lambda event: int(event["event_sequence"]))
+    unique.sort(key=lambda item: int(item.event["event_sequence"]))
     return (
         unique,
         exact_retry_count,
@@ -114,21 +182,24 @@ def reconstruct_runs(
 ) -> list[ReconstructedRun]:
     """Bronze 레코드를 run_id별로 복원하고 품질 상태를 판정한다."""
 
-    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    grouped: dict[str, list[_BronzeEvent]] = defaultdict(list)
 
     for index, bronze_record in enumerate(bronze_records):
         if not isinstance(bronze_record, Mapping):
             raise SilverInputError(
                 f"Bronze record {index} must be a JSON object"
             )
-        event = _extract_event(bronze_record, index)
-        grouped[str(event["run_id"])].append(event)
+        bronze_event = _extract_event(bronze_record, index)
+        grouped[str(bronze_event.event["run_id"])].append(
+            bronze_event
+        )
 
     # 같은 event_id가 서로 다른 Run에서 사용된 경우 양쪽 Run을 INVALID로 만든다.
     event_owners: dict[str, tuple[str, str]] = {}
     cross_run_issues: dict[str, list[ValidationIssue]] = defaultdict(list)
     for run_id, events in grouped.items():
-        for event in events:
+        for bronze_event in events:
+            event = bronze_event.event
             event_id = str(event["event_id"])
             canonical = _canonical_event(event)
             previous = event_owners.get(event_id)
@@ -151,13 +222,14 @@ def reconstruct_runs(
 
     reconstructed: list[ReconstructedRun] = []
     for run_id in sorted(grouped):
-        input_events = grouped[run_id]
+        input_records = grouped[run_id]
+        input_events = [record.event for record in input_records]
         validation = validate_anonymous_sequence(input_events)
         (
             unique_events,
             exact_retry_count,
             conflicting_duplicate_count,
-        ) = _deduplicate_run_events(input_events)
+        ) = _deduplicate_run_events(input_records)
         issues = (
             *validation.issues,
             *cross_run_issues.get(run_id, ()),
@@ -171,11 +243,11 @@ def reconstruct_runs(
         reconstructed.append(
             ReconstructedRun(
                 run_id=run_id,
-                source_type=str(unique_events[0]["source_type"]),
+                source_type=str(unique_events[0].event["source_type"]),
                 status=status,
                 events=tuple(unique_events),
                 issues=tuple(issues),
-                input_event_count=len(input_events),
+                input_event_count=len(input_records),
                 unique_event_count=len(unique_events),
                 exact_retry_count=exact_retry_count,
                 conflicting_duplicate_count=conflicting_duplicate_count,

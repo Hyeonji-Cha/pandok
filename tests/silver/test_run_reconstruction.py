@@ -6,9 +6,11 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 
+import pytest
+
 from pandok_contracts import ReasonCode, SequenceStatus
 from pandok_ingestion.bronze import build_bronze_record
-from pandok_silver import reconstruct_runs
+from pandok_silver import SilverInputError, reconstruct_runs
 
 
 def _bronze_records(
@@ -40,19 +42,33 @@ def test_reconstructs_runs_in_sequence_and_removes_retry(
     records = _bronze_records(
         list(reversed(anonymous_sequence)) + [retry] + second_run
     )
+    records[1]["metadata"]["received_at"] = "2026-09-03T00:02:00.000Z"
+    records[5]["metadata"]["received_at"] = "2026-09-03T00:01:00.000Z"
 
     runs = reconstruct_runs(records)
 
     assert len(runs) == 2
     first = runs[0]
     assert first.status == SequenceStatus.VALID
-    assert [event["event_sequence"] for event in first.events] == [
+    assert [item.event["event_sequence"] for item in first.events] == [
         1,
         2,
         3,
         4,
         5,
     ]
+    retried_event = next(
+        item for item in first.events if item.event["event_sequence"] == 4
+    )
+    assert retried_event.first_received_at == datetime(
+        2026,
+        9,
+        3,
+        0,
+        1,
+        tzinfo=timezone.utc,
+    )
+    assert retried_event.ingestion_channel == "turkiye_gateway"
     assert first.input_event_count == 6
     assert first.unique_event_count == 5
     assert first.exact_retry_count == 1
@@ -125,3 +141,11 @@ def test_marks_event_id_reused_across_runs_as_invalid(
         )
         for run in runs
     )
+
+
+def test_rejects_bronze_record_without_metadata(anonymous_sequence):
+    record = _bronze_records([anonymous_sequence[0]])[0]
+    del record["metadata"]
+
+    with pytest.raises(SilverInputError, match="no metadata object"):
+        reconstruct_runs([record])
