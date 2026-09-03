@@ -23,6 +23,7 @@ class ReasonCode(StrEnum):
     CHOICE_NOT_FOUND = "choice_not_found"
     CHOICE_MISMATCH = "choice_mismatch"
     COUNTER_DECREASED = "counter_decreased"
+    EVENT_ARRIVAL_TOO_LATE = "event_arrival_too_late"
 
 
 class SequenceStatus(StrEnum):

@@ -15,7 +15,10 @@ from typing import Any
 
 import boto3
 
-from pandok_silver import put_silver_and_quarantine, reconstruct_runs
+from pandok_silver import (
+    put_silver_and_quarantine,
+    reconstruct_received_date_batch,
+)
 
 
 def read_bronze_records(
@@ -49,9 +52,8 @@ def main() -> None:
     parser.add_argument("--received-date", required=True)
     arguments = parser.parse_args()
 
-    bronze_prefix = (
-        f"bronze/received_date={arguments.received_date}/"
-    )
+    # 30일 보존 범위를 함께 읽어 날짜를 넘겨 도착한 같은 Run 이벤트도 연결한다.
+    bronze_prefix = "bronze/"
     bronze_records = list(
         read_bronze_records(arguments.bronze_bucket, bronze_prefix)
     )
@@ -60,17 +62,21 @@ def main() -> None:
             f"No Bronze records found under {bronze_prefix}"
         )
 
-    reconstructed_runs = reconstruct_runs(bronze_records)
+    batch = reconstruct_received_date_batch(
+        bronze_records,
+        arguments.received_date,
+    )
     s3_client = boto3.client("s3")
     write_result = put_silver_and_quarantine(
-        reconstructed_runs,
+        batch.runs,
         arguments.silver_bucket,
         arguments.received_date,
         s3_client,
     )
 
-    print(f"BRONZE_RECORDS={len(bronze_records)}")
-    print(f"SILVER_RUNS={len(reconstructed_runs)}")
+    print(f"BRONZE_RECORDS_SCANNED={len(bronze_records)}")
+    print(f"RECONSTRUCTED_RUNS={batch.reconstructed_run_count}")
+    print(f"TARGET_DATE_RUNS={len(batch.runs)}")
     print(f"SILVER_ACCEPTED_RUNS={write_result.silver_run_count}")
     print(
         "QUARANTINED_RUNS="
@@ -85,7 +91,7 @@ def main() -> None:
         f"s3://{arguments.silver_bucket}/{write_result.quarantine_key}"
     )
 
-    for run in reconstructed_runs:
+    for run in batch.runs:
         print(
             f"run_id={run.run_id} "
             f"status={run.status.value} "
