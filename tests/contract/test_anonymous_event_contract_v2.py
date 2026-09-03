@@ -4,9 +4,15 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
+
+from pandok_contracts.validator import (
+    _resolve_schema_path,
+    _schema_path_candidates,
+)
 
 from conftest import REPO_ROOT, read_json
 
@@ -29,6 +35,20 @@ def anonymous_sequence() -> list[dict[str, object]]:
 
 def test_v2_schema_itself_is_valid() -> None:
     Draft202012Validator.check_schema(read_json(SCHEMA_PATH))
+
+
+def test_schema_path_resolves_local_source_layout() -> None:
+    assert _resolve_schema_path() == SCHEMA_PATH.resolve()
+
+
+def test_schema_path_checks_lambda_task_root() -> None:
+    module_path = Path("C:/var/task/pandok_contracts/validator.py")
+
+    candidates = _schema_path_candidates(module_path)
+
+    assert candidates[0] == Path(
+        "C:/var/task/contracts/telemetry-event-v2.schema.json"
+    )
 
 
 def test_all_five_anonymous_run_events_are_valid(

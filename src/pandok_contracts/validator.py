@@ -20,11 +20,36 @@ from .errors import (
 )
 
 
-SCHEMA_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "contracts"
-    / "telemetry-event-v2.schema.json"
-)
+_SCHEMA_FILENAME = "telemetry-event-v2.schema.json"
+
+
+# 실행 중인 모듈 위치에서 Lambda 루트와 로컬 저장소 루트를 순서대로 계산한다.
+def _schema_path_candidates(module_file: Path) -> tuple[Path, Path]:
+    """Return supported Lambda and source-layout Schema paths."""
+
+    resolved_module = module_file.resolve()
+    return (
+        resolved_module.parents[1] / "contracts" / _SCHEMA_FILENAME,
+        resolved_module.parents[2] / "contracts" / _SCHEMA_FILENAME,
+    )
+
+
+# 로컬 src 배치와 Lambda ZIP의 최상위 패키지 배치에서 같은 계약 파일을 찾는다.
+def _resolve_schema_path(module_file: Path = Path(__file__)) -> Path:
+    """Find the telemetry Schema in supported source and Lambda layouts."""
+
+    candidates = _schema_path_candidates(module_file)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+
+    searched = ", ".join(str(candidate) for candidate in candidates)
+    raise FileNotFoundError(
+        f"Telemetry Schema was not found in supported layouts: {searched}"
+    )
+
+
+SCHEMA_PATH = _resolve_schema_path()
 
 # 계정·기기·네트워크·인증정보와 영구 식별자로 해석될 수 있는 키를 차단한다.
 _PROHIBITED_KEYS = frozenset(
