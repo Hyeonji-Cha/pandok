@@ -33,7 +33,8 @@ class ReconstructedRun:
     issues: tuple[ValidationIssue, ...]
     input_event_count: int
     unique_event_count: int
-    duplicate_event_count: int
+    exact_retry_count: int
+    conflicting_duplicate_count: int
 
 
 def _canonical_event(event: Mapping[str, Any]) -> str:
@@ -77,12 +78,13 @@ def _extract_event(
 
 def _deduplicate_run_events(
     events: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], int]:
-    """같은 event_id와 같은 본문의 retry만 Silver 이벤트에서 제거한다."""
+) -> tuple[list[dict[str, Any]], int, int]:
+    """정상 retry와 본문 충돌을 구분하며 Silver 이벤트를 한 건씩 남긴다."""
 
     seen: dict[str, str] = {}
     unique: list[dict[str, Any]] = []
-    duplicate_count = 0
+    exact_retry_count = 0
+    conflicting_duplicate_count = 0
 
     for event in events:
         event_id = str(event["event_id"])
@@ -93,12 +95,18 @@ def _deduplicate_run_events(
             seen[event_id] = canonical
             unique.append(event)
         elif previous == canonical:
-            duplicate_count += 1
-        # 같은 ID의 다른 본문은 validator가 INVALID로 판정한다.
-        # Silver 출력에는 먼저 도착한 한 건만 남기고 충돌 근거는 issues에 보존한다.
+            exact_retry_count += 1
+        else:
+            # 충돌 이벤트도 출력에서는 제거하지만 정상 retry와 별도 개수로 기록한다.
+            # INVALID 판정의 상세한 이유는 sequence validator가 issues에 보존한다.
+            conflicting_duplicate_count += 1
 
     unique.sort(key=lambda event: int(event["event_sequence"]))
-    return unique, duplicate_count
+    return (
+        unique,
+        exact_retry_count,
+        conflicting_duplicate_count,
+    )
 
 
 def reconstruct_runs(
@@ -145,9 +153,11 @@ def reconstruct_runs(
     for run_id in sorted(grouped):
         input_events = grouped[run_id]
         validation = validate_anonymous_sequence(input_events)
-        unique_events, duplicate_count = _deduplicate_run_events(
-            input_events
-        )
+        (
+            unique_events,
+            exact_retry_count,
+            conflicting_duplicate_count,
+        ) = _deduplicate_run_events(input_events)
         issues = (
             *validation.issues,
             *cross_run_issues.get(run_id, ()),
@@ -167,7 +177,8 @@ def reconstruct_runs(
                 issues=tuple(issues),
                 input_event_count=len(input_events),
                 unique_event_count=len(unique_events),
-                duplicate_event_count=duplicate_count,
+                exact_retry_count=exact_retry_count,
+                conflicting_duplicate_count=conflicting_duplicate_count,
             )
         )
 

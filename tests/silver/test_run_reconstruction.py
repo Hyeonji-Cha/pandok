@@ -55,7 +55,13 @@ def test_reconstructs_runs_in_sequence_and_removes_retry(
     ]
     assert first.input_event_count == 6
     assert first.unique_event_count == 5
-    assert first.duplicate_event_count == 1
+    assert first.exact_retry_count == 1
+    assert first.conflicting_duplicate_count == 0
+    assert first.input_event_count == (
+        first.unique_event_count
+        + first.exact_retry_count
+        + first.conflicting_duplicate_count
+    )
 
 
 def test_preserves_incomplete_run_status(anonymous_sequence):
@@ -79,6 +85,13 @@ def test_marks_conflicting_retry_as_invalid(anonymous_sequence):
 
     assert run.status == SequenceStatus.INVALID
     assert run.unique_event_count == len(anonymous_sequence)
+    assert run.exact_retry_count == 0
+    assert run.conflicting_duplicate_count == 1
+    assert run.input_event_count == (
+        run.unique_event_count
+        + run.exact_retry_count
+        + run.conflicting_duplicate_count
+    )
     assert any(
         issue.code == ReasonCode.DUPLICATE_CONFLICT
         for issue in run.issues
