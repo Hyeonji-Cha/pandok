@@ -1,5 +1,9 @@
-# S3 Bronze 객체를 내려받아 Run 단위 Silver 데이터로 복원한다.
-# 실제 AWS 저장 결과가 중복·순서 검증을 거쳐 분석 가능한 Run으로 변환되는지 확인하기 위해 사용한다.
+# S3 Bronze를 읽어 Silver 처리의 전체 순서를 실행하는 진입점이다.
+# 이 파일이 Run 복원이나 Parquet 생성을 직접 구현하는 것은 아니다.
+# run_reconstruction에 이벤트 복원을, s3_writer에 Parquet 저장을 맡기고
+# "Bronze 읽기 -> Run 복원 -> Silver S3 저장" 단계를 연결한다.
+# 날짜별 원본 전체를 같은 규칙으로 재처리할 수 있게 하여 네트워크 도착 순서와
+# retry 중복이 분석 결과에 영향을 주지 않는 Silver 데이터를 만들기 위해 필요하다.
 
 from __future__ import annotations
 
@@ -11,7 +15,7 @@ from typing import Any
 
 import boto3
 
-from pandok_silver import put_silver_parquet, reconstruct_runs
+from pandok_silver import put_silver_and_quarantine, reconstruct_runs
 
 
 def read_bronze_records(
@@ -58,7 +62,7 @@ def main() -> None:
 
     reconstructed_runs = reconstruct_runs(bronze_records)
     s3_client = boto3.client("s3")
-    silver_key = put_silver_parquet(
+    write_result = put_silver_and_quarantine(
         reconstructed_runs,
         arguments.silver_bucket,
         arguments.received_date,
@@ -67,8 +71,18 @@ def main() -> None:
 
     print(f"BRONZE_RECORDS={len(bronze_records)}")
     print(f"SILVER_RUNS={len(reconstructed_runs)}")
+    print(f"SILVER_ACCEPTED_RUNS={write_result.silver_run_count}")
     print(
-        f"SILVER_OUTPUT=s3://{arguments.silver_bucket}/{silver_key}"
+        "QUARANTINED_RUNS="
+        f"{write_result.quarantine_run_count}"
+    )
+    print(
+        "SILVER_OUTPUT="
+        f"s3://{arguments.silver_bucket}/{write_result.silver_key}"
+    )
+    print(
+        "QUARANTINE_OUTPUT="
+        f"s3://{arguments.silver_bucket}/{write_result.quarantine_key}"
     )
 
     for run in reconstructed_runs:
