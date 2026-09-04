@@ -29,7 +29,7 @@
 4. Deploy the Sydney ingestion endpoint with production export disabled.
 5. Send controlled v2 events through the Türkiye Gateway.
 6. Verify Bronze, Silver, and Gold with synthetic data.
-7. Enable limited consented production testing only after operational and
+7. Enable consented testing on a password-protected Steam beta branch only after operational and
    privacy controls are confirmed.
 
 ## Required Evidence Before Production

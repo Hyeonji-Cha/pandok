@@ -2,8 +2,8 @@
 
 ## Goal
 
-Collect anonymous telemetry from consenting Steam players, transform incomplete and retry-prone events into
-trusted Run analytics, and provide traceable improvement evidence to the game developer.
+Collect anonymous telemetry from consenting password-protected Steam beta testers, transform incomplete and
+retry-prone events into trusted Run analytics, and provide traceable improvement evidence to the game developer.
 
 ## P0 scope
 
@@ -17,13 +17,13 @@ trusted Run analytics, and provide traceable improvement evidence to the game de
 - Athena queries against the same Gold tables and automatic metric comparison
 - Local Airflow manual orchestration, quality checks, and date-scoped backfills
 - One English Bedrock report per successful DAG run, using validated Gold metrics only
-- At least one real consented Run traced end to end
+- At least one consented Steam beta Run traced end to end
 
 ## Data sources
 
 | `source_type` | Purpose | Product analytics |
 |---|---|---|
-| `CONSENTED_PROD_PLAY` | Natural play by consenting Steam users | Included |
+| `CONSENTED_PROD_PLAY` | Natural play by consenting Steam beta testers | Included |
 | `CONTROLLED_SCENARIO` | Reproducible functional and edge-case tests | Excluded |
 | `LOAD_TEST` | Throughput, backpressure, and recovery tests | Excluded |
 

@@ -6,7 +6,7 @@ the privacy boundary; the Game Client does not connect directly to AWS.
 ## Target flow
 
 ```text
-Steam consented player
+Password-protected Steam beta tester
 CONSENTED_PROD_PLAY
           |
    Unity Game Client
