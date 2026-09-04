@@ -29,6 +29,7 @@ packages = [
   "src/pandok_producer",
   "src/pandok_silver",
   "src/pandok_gold",
+  "src/pandok_reports",
 ]
 
 [tool.pytest.ini_options]

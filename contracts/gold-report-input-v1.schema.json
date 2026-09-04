@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandok.dev/contracts/gold-report-input-v1.schema.json",
+  "title": "PANDOK Gold Report Input v1",
+  "$comment": "Only validated aggregate Gold metrics may be sent to Bedrock. Run, event, user, session, device, network, and exact event-time fields are prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "report_date", "metrics"],
+  "properties": {
+    "schema_version": {"const": "gold-report-input-v1"},
+    "report_date": {"type": "string", "format": "date"},
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_quality",
+        "run_outcomes",
+        "checkpoint_metrics",
+        "upgrade_funnel"
+      ],
+      "properties": {
+        "run_quality": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {"$ref": "#/$defs/runQuality"}
+        },
+        "run_outcomes": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {"$ref": "#/$defs/runOutcome"}
+        },
+        "checkpoint_metrics": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {"$ref": "#/$defs/checkpointMetric"}
+        },
+        "upgrade_funnel": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/upgradeMetric"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "nonNegativeNumber": {"type": "number", "minimum": 0},
+    "percentage": {"type": "number", "minimum": 0, "maximum": 100},
+    "shortLabel": {"type": "string", "minLength": 1, "maxLength": 128},
+    "runQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_status",
+        "run_count",
+        "input_event_count",
+        "unique_event_count",
+        "exact_retry_count",
+        "conflicting_duplicate_count"
+      ],
+      "properties": {
+        "run_status": {"$ref": "#/$defs/shortLabel"},
+        "run_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "input_event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "unique_event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "exact_retry_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "conflicting_duplicate_count": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "runOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "end_reason",
+        "ended_run_count",
+        "ended_run_percentage",
+        "average_run_seconds"
+      ],
+      "properties": {
+        "end_reason": {"$ref": "#/$defs/shortLabel"},
+        "ended_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "ended_run_percentage": {"$ref": "#/$defs/percentage"},
+        "average_run_seconds": {"$ref": "#/$defs/nonNegativeNumber"}
+      }
+    },
+    "checkpointMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpoint_number",
+        "checkpoint_event_count",
+        "average_player_level",
+        "average_current_xp",
+        "average_xp_to_next_level",
+        "average_hp_percent",
+        "average_total_kills",
+        "average_current_gold"
+      ],
+      "properties": {
+        "checkpoint_number": {"$ref": "#/$defs/nonNegativeInteger"},
+        "checkpoint_event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "average_player_level": {"$ref": "#/$defs/nonNegativeNumber"},
+        "average_current_xp": {"$ref": "#/$defs/nonNegativeNumber"},
+        "average_xp_to_next_level": {"$ref": "#/$defs/nonNegativeNumber"},
+        "average_hp_percent": {"$ref": "#/$defs/percentage"},
+        "average_total_kills": {"$ref": "#/$defs/nonNegativeNumber"},
+        "average_current_gold": {"$ref": "#/$defs/nonNegativeNumber"}
+      }
+    },
+    "upgradeMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "choice_source",
+        "item_id",
+        "rarity",
+        "exposure_count",
+        "selection_count",
+        "selection_percentage"
+      ],
+      "properties": {
+        "choice_source": {"$ref": "#/$defs/shortLabel"},
+        "item_id": {"$ref": "#/$defs/shortLabel"},
+        "rarity": {"$ref": "#/$defs/shortLabel"},
+        "exposure_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "selection_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "selection_percentage": {"$ref": "#/$defs/percentage"}
+      }
+    }
+  }
+}
