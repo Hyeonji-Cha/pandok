@@ -159,3 +159,24 @@ def build_gold_report_input(
             f"Bedrock 입력이 비용 제한 {MAX_REPORT_INPUT_BYTES} bytes를 초과했습니다."
         )
     return payload
+
+
+def validate_gold_report_input(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """외부에서 받은 payload도 builder와 같은 허용 컬럼·크기 제한으로 다시 검증한다."""
+
+    if set(payload) != {"schema_version", "report_date", "metrics"}:
+        raise GoldReportInputError("Gold 보고서 입력의 최상위 필드가 계약과 다릅니다.")
+    if payload.get("schema_version") != "gold-report-input-v1":
+        raise GoldReportInputError("지원하지 않는 Gold 보고서 Schema입니다.")
+
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, Mapping) or set(metrics) != set(_SECTION_COLUMNS):
+        raise GoldReportInputError("Gold 보고서 metric 섹션이 계약과 다릅니다.")
+
+    return build_gold_report_input(
+        str(payload.get("report_date", "")),
+        run_quality=metrics["run_quality"],
+        run_outcomes=metrics["run_outcomes"],
+        checkpoint_metrics=metrics["checkpoint_metrics"],
+        upgrade_funnel=metrics["upgrade_funnel"],
+    )
