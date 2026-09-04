@@ -1,0 +1,2 @@
+# Airflow에서 Snowflake SQL과 조회 작업을 실행하기 위한 공식 provider이다.
+apache-airflow-providers-snowflake==6.16.1

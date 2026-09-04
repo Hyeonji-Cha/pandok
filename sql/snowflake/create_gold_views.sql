@@ -1,13 +1,8 @@
 -- Silver Iceberg 이벤트를 분석용 Gold 지표와 품질 검사 View로 변환한다.
 -- Snowflake Workspace에만 있던 SQL을 Git과 Airflow에서 재사용하기 위해 필요하다.
 
-USE ROLE ACCOUNTADMIN;
-
-CREATE SCHEMA IF NOT EXISTS PANDOK.GOLD;
-
-GRANT USAGE ON SCHEMA PANDOK.GOLD TO ROLE PANDOK_ENGINEER;
-GRANT CREATE VIEW ON SCHEMA PANDOK.GOLD TO ROLE PANDOK_ENGINEER;
-
+-- PANDOK.GOLD 스키마와 권한은 최초 설정에서 이미 생성했다고 가정한다.
+-- 반복 실행 DAG가 과도한 ACCOUNTADMIN 권한을 사용하지 않도록 운영 역할만 사용한다.
 USE ROLE PANDOK_ENGINEER;
 USE WAREHOUSE PANDOK_WH;
 USE DATABASE PANDOK;

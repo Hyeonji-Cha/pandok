@@ -24,6 +24,7 @@ Thumbs.db
 *.tfstate
 *.tfstate.*
 terraform.tfvars
+airflow/.env
 terraform.tfvars.json
 *.auto.tfvars
 *.auto.tfvars.json

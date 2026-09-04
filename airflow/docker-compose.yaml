@@ -1,0 +1,28 @@
+# 필요할 때만 로컬 Airflow를 실행해 파이프라인 자동화 흐름을 검증한다.
+# 상시 서버를 사용하지 않아 학습용 프로젝트의 운영 비용을 만들지 않는다.
+services:
+  airflow:
+    build:
+      context: ..
+      dockerfile: airflow/Dockerfile
+    command: standalone
+    restart: "no"
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AWS_PROFILE: "${AWS_PROFILE:-default}"
+      AWS_REGION: "${PANDOK_AWS_REGION:-ap-southeast-2}"
+      AWS_DEFAULT_REGION: "${PANDOK_AWS_REGION:-ap-southeast-2}"
+      PANDOK_BRONZE_BUCKET: "${PANDOK_BRONZE_BUCKET:-}"
+      PANDOK_SILVER_BUCKET: "${PANDOK_SILVER_BUCKET:-}"
+      PANDOK_ATHENA_WORKGROUP: "${PANDOK_ATHENA_WORKGROUP:-pandok-dev}"
+    volumes:
+      - airflow_home:/opt/airflow
+      - ./dags:/opt/airflow/dags:ro
+      - ../sql:/opt/pandok/sql:ro
+      - "${USERPROFILE}/.aws:/home/airflow/.aws:ro"
+
+volumes:
+  airflow_home:
