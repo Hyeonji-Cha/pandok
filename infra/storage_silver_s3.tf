@@ -95,6 +95,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "silver" {
       days_after_initiation = 7
     }
   }
+
+  # AI 보고서도 승인된 기간 뒤 삭제해 오래된 분석과 저장 비용이 누적되지 않게 한다.
+  rule {
+    id     = "expire-ai-reports"
+    status = "Enabled"
+
+    filter {
+      prefix = "ai-reports/"
+    }
+
+    expiration {
+      days = var.silver_retention_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
 }
 
 # 암호화되지 않은 HTTP 연결로 Silver 데이터에 접근하는 것을 거부한다.

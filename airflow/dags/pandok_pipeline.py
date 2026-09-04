@@ -14,6 +14,7 @@ from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 from airflow.sdk import dag, get_current_context, task
 
 from pandok_gold import reconcile_metric_rows
+from pandok_reports import generate_report_from_athena, put_ai_report
 from pandok_silver import put_silver_and_quarantine, reconstruct_received_date_batch
 from pandok_silver.s3_runner import read_bronze_records
 
@@ -249,13 +250,45 @@ def pandok_bronze_to_gold() -> None:
         if not result.matched:
             raise ValueError(f"Gold reconciliation failed: {result.differences}")
 
+    @task
+    def generate_ai_report(
+        silver_result: dict[str, Any],
+        _reconciliation_complete: None,
+    ) -> dict[str, Any]:
+        """Gold 대조 성공 후 영어 보고서를 한 번 생성해 기존 Silver 버킷에 저장한다."""
+
+        report_date = silver_result["received_date"]
+        report = generate_report_from_athena(
+            report_date,
+            workgroup=_required_environment("PANDOK_ATHENA_WORKGROUP"),
+        )
+        bucket_name = _required_environment("PANDOK_SILVER_BUCKET")
+        object_key = put_ai_report(
+            report,
+            bucket_name,
+            report_date,
+            boto3.client("s3", region_name=os.getenv("AWS_REGION", AWS_REGION)),
+        )
+        # 보고서 본문은 Airflow XCom과 로그에 복사하지 않고 위치·비용 정보만 남긴다.
+        return {
+            "report_uri": f"s3://{bucket_name}/{object_key}",
+            "model_id": report.model_id,
+            "input_tokens": report.input_tokens,
+            "output_tokens": report.output_tokens,
+            "total_tokens": report.total_tokens,
+        }
+
     silver = rebuild_silver()
     iceberg = refresh_silver_iceberg(silver)
     refreshed = refresh_snowflake_silver(iceberg)
     views = create_gold_views(refreshed)
     checked = check_gold_quality(views)
     gold = load_gold_iceberg(checked)
-    reconcile_gold(query_snowflake_gold(gold), query_athena_gold(gold))
+    reconciliation = reconcile_gold(
+        query_snowflake_gold(gold),
+        query_athena_gold(gold),
+    )
+    generate_ai_report(gold, reconciliation)
 
 
 pandok_bronze_to_gold()
