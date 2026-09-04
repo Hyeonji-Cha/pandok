@@ -10,14 +10,14 @@ trusted Run analytics, and provide traceable improvement evidence to the game de
 - Explicit opt-in, revocation, and unsent-queue deletion
 - Versioned JSON event contract and automated validation
 - API Gateway, Lambda, Kinesis, Firehose, and immutable S3 Bronze JSON
-- Flink Event Time, Watermark, deduplication, late-event handling, and Quarantine
+- Python batch deduplication, `event_sequence` ordering, Run reconstruction, and Quarantine
 - Plain Parquet baseline followed by an evidence-backed Silver Iceberg transition
 - AWS Glue Data Catalog as the shared Iceberg catalog
 - Snowflake transformations that create Gold Iceberg tables in S3
 - Athena queries against the same Gold tables and automatic metric comparison
-- Airflow scheduling, quality checks, retries, and date-scoped backfills
-- Bedrock report generation from validated Gold metrics only
-- At least one real consented event traced end to end
+- Local Airflow manual orchestration, quality checks, and date-scoped backfills
+- One English Bedrock report per successful DAG run, using validated Gold metrics only
+- At least one real consented Run traced end to end
 
 ## Data sources
 
@@ -38,20 +38,29 @@ producer is authorized to use the supplied value.
 - Treating synthetic traffic as real users
 - Generalizing a small tester sample to the whole player population
 - Unapproved high-cost AWS resources such as NAT Gateway or MWAA
+- Managed Flink and continuously scheduled Airflow runs
 - Autonomous game changes based on AI output
 
 ## Completion criteria
 
 - A consenting player's event reaches Gold.
 - Duplicate events do not duplicate trusted metrics.
-- Invalid and excessively late events are separated with reasons.
-- Late-event and timeout rules are reproducible in tests.
+- Invalid and conflicting Runs are separated with reasons.
+- Incomplete, retry, conflict, and sequence rules are reproducible in tests.
 - A selected date can be backfilled.
 - Bronze, Silver, Quarantine, and Gold count differences are explainable.
 - Snowflake and Athena agree on defined Gold metrics.
 - Bedrock numbers are traceable to validated Gold metric IDs.
 - Terraform reproduces the core AWS infrastructure.
 - README and evidence documents are sufficient to understand and demonstrate the system.
+
+## Verified P0 result
+
+On 2026-09-04, one consented production Run completed the implemented path from Unity through Türkiye and
+AWS to Silver, Gold, cross-engine reconciliation, and an S3-stored Bedrock report. The result proves path
+connectivity and transformation behavior only; one Run is not sufficient for gameplay conclusions.
+
+See [E2E validation evidence](e2e-validation-2026-09-04.md).
 
 ## Delivery method
 

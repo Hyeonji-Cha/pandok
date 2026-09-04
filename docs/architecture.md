@@ -1,50 +1,47 @@
 # PANDOK Architecture
 
-> **Redesign status:** The direct Steam-to-AWS path below is the previous architecture and must not be
-> implemented or deployed. The active requirements are in
-> [Privacy-by-Design Telemetry Baseline](privacy-by-design.md). This document will be rewritten only after
-> the read-only repository, field, risk, schema, and architecture review in redesign Phases 1-6.
+This document describes the architecture implemented and verified on 2026-09-04. The Türkiye Gateway is
+the privacy boundary; the Game Client does not connect directly to AWS.
 
 ## Target flow
 
 ```text
-Steam consented players                    ECS Fargate Generator
-CONSENTED_PROD_PLAY                   CONTROLLED_SCENARIO / LOAD_TEST
-             \                                  /
-              `-------> API Gateway <----------'
-                           |
-                     Ingestion Lambda
-               schema validation + received_at
-                           |
-                  Kinesis Data Streams
-                     /             \
-                    /               \
-             Data Firehose       Managed Flink
-                    |          event time / watermark
-                    |          dedup / late / Run state
-                    |             /             \
-             S3 Bronze JSON      /               \-> S3 Quarantine
-             immutable source   v
-                         S3 Silver Iceberg
-                                  |
-                         Glue Data Catalog
-                                  |
-                  Airflow -> Snowflake SQL
-                  schedule / DQ / retry / backfill
-                                  |
-                           S3 Gold Iceberg
-                       /          |           \
-              Athena validation  |       Developer dashboard
-                       \          |
-                        metric comparison
-                                  |
-                         approved Gold metrics
-                                  |
-                       Report Lambda -> Bedrock
-                                  |
-                            S3 AI Reports
-                                  |
-                           Developer review
+Steam consented player
+CONSENTED_PROD_PLAY
+          |
+   Unity Game Client
+          |
+ Türkiye Gateway
+ privacy removal + v2 reconstruction
+          |
+   AWS Sydney API Gateway
+          |
+   Ingestion Lambda
+ JSON parsing + contract validation + received_at
+          |
+ Kinesis Data Streams -> Firehose -> S3 Bronze JSON
+          |                optional streaming switch
+          v
+ Local Airflow (manual, date-scoped, no automatic retry)
+          |
+ Python Silver reconstruction
+ dedup + event_sequence ordering + Run status
+       /     \
+      v       v
+ Silver      Quarantine
+ Parquet
+      |
+ Athena -> Glue Data Catalog -> Silver Iceberg
+      |
+ Snowflake reads Silver and creates Gold Iceberg in S3/Glue
+      |
+ Snowflake result <-> Athena result reconciliation
+      |
+ validated aggregate Gold metrics only
+      |
+ Bedrock Nova Micro -> S3 English Markdown report
+      |
+ Developer review
 ```
 
 ## Ownership
@@ -53,24 +50,25 @@ CONSENTED_PROD_PLAY                   CONTROLLED_SCENARIO / LOAD_TEST
 |---|---|
 | API Gateway | Public HTTPS boundary and request limits |
 | Lambda | Contract validation, server metadata, and Kinesis delivery |
-| Kinesis | Durable fan-out buffer |
-| Firehose | Independent Bronze delivery |
+| Kinesis | Short-lived streaming buffer, enabled only during ingestion tests |
+| Firehose | Delivery from Kinesis to partitioned Bronze objects |
 | S3 Bronze | Immutable replay and recovery source |
-| Flink | Streaming correctness and Silver production |
+| Python Silver batch | Deduplication, sequence ordering, and Run reconstruction |
 | S3 Silver Iceberg | Trusted event and Run state |
-| Quarantine | Invalid or excessively late records with reasons |
+| Quarantine | Invalid or conflicting Runs with reasons |
 | Glue Data Catalog | Authoritative Silver and Gold Iceberg metadata |
 | Snowflake | Silver analytics and Gold Iceberg transformation |
 | Athena | Independent query and Gold metric reconciliation |
-| Airflow | Ordering, retries, quality gates, and date backfills |
-| Bedrock | Structured suggestions from approved aggregate metrics |
+| Local Airflow | Manual date-scoped ordering and quality gates; retries are disabled |
+| Bedrock Nova Micro | One English report from approved aggregate metrics per DAG run |
+| S3 AI report | Date-partitioned Markdown output; the same date is overwritten |
 
 ## Implementation sequence
 
 1. Finalize the P0 contract.
 2. Preserve Bronze JSON.
 3. Implement the minimum Silver Plain Parquet path.
-4. Reproduce duplicate, late-event, and date-backfill problems.
+4. Reproduce incomplete, retry, conflict, and date-backfill behavior.
 5. Record the Iceberg decision in an ADR.
 6. Convert Silver to Glue-cataloged Iceberg.
 7. Configure the Snowflake external volume and Glue REST catalog integration.
@@ -80,10 +78,22 @@ CONSENTED_PROD_PLAY                   CONTROLLED_SCENARIO / LOAD_TEST
 11. Let Airflow run transformation and validation in sequence.
 12. Send only validated Gold metrics to Bedrock.
 
+All twelve steps were exercised successfully on 2026-09-04. This is an end-to-end implementation result,
+not proof that the metrics are statistically representative; the real-game verification sample contains
+one Run.
+
 ## Data trust gates
 
 - Bronze stores accepted source records, including retries.
-- Silver contains schema-valid, deduplicated records; invalid and too-late records go to Quarantine.
+- Silver contains schema-valid, deduplicated records; invalid or conflicting Runs go to Quarantine.
 - Product Gold filters to `CONSENTED_PROD_PLAY`.
 - Bedrock is blocked when Snowflake/Athena reconciliation or Gold quality checks fail.
 - AI output is advisory and never the source of record.
+
+## Cost and shutdown boundary
+
+- Managed Flink, NAT Gateway, and MWAA are not part of the implemented architecture.
+- Local Airflow has `schedule=None`, zero task retries, and at most one active DAG run.
+- Kinesis and Firehose are controlled by `enable_streaming` and are disabled outside game tests.
+- S3 data has lifecycle limits, Athena uses the project workgroup, and Bedrock input/output sizes are capped.
+- API Gateway and Lambda stay deployed so the public endpoint remains unchanged.

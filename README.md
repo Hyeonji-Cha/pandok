@@ -6,7 +6,7 @@ and generates developer-facing game improvement reports from verified Gold metri
 
 ## Current status
 
-The executable P0 telemetry contract and its Python validator are implemented. PANDOK v2 is the only
+The P0 path has been implemented and verified with one consented production Run. PANDOK v2 is the only
 AWS-bound event contract and follows the active [Privacy-by-Design baseline](docs/privacy-by-design.md).
 
 Supported P0 events:
@@ -27,12 +27,15 @@ Game Client
     -> privacy boundary
     -> AWS Sydney API Gateway
     -> Lambda Privacy Validator
-    -> Kinesis -> Flink -> Firehose -> Bronze -> Silver -> Gold -> LLM report
+    -> Kinesis -> Firehose -> S3 Bronze
+    -> local Airflow -> Silver Iceberg -> Snowflake Gold Iceberg
+    -> Athena reconciliation -> Bedrock report -> S3
 ```
 
 The Game Client must not connect directly to AWS. The Türkiye gateway terminates the incoming request,
 reconstructs an allow-listed payload, removes client-network headers, and creates a new outbound request.
-Detailed service ownership remains under review until redesign Phases 1-6 are approved.
+Kinesis and Firehose can be disabled together when no game test is running. API Gateway, Lambda, and the
+storage/catalog resources remain stable, so the developer-facing endpoint does not change between tests.
 
 See [architecture](docs/architecture.md), [project scope](docs/project-scope.md), and the
 [event contract](docs/event-contract.md) for the active project documentation.
@@ -86,6 +89,7 @@ message, field path, and event ID when available.
 | Contract entities and invariants | `docs/event-data-model.md` |
 | Local contract validation | `docs/contract-validation.md` |
 | Unity implementation and evidence | `docs/unity-telemetry-integration-plan.md` |
+| Verified end-to-end execution evidence | `docs/e2e-validation-2026-09-04.md` |
 | Architecture decisions | `docs/decisions/` |
 
 ## Working method
@@ -98,12 +102,15 @@ scope and decision -> small implementation unit -> automated test -> execution e
 
 ## Last verified baseline
 
-The repository records the following baseline from 2026-08-30/31:
+The repository records the following baseline from 2026-09-04:
 
-- JSON Schema Draft 2020-12 self-validation passed.
-- Automated contract suite: 92 passed.
-- Valid five-record anonymous P0 Run sequence accepted.
-- Prohibited `steam_id` rejected with `prohibited_field`.
-- 10,000 single-event validations completed below the 10-second acceptance threshold.
+- A full Python baseline passed 163 tests; the later report module passed its 11 focused tests.
+- One `CONSENTED_PROD_PLAY` Run reached Bronze, Silver, Gold, and the AI report path.
+- The Run contained 69 events and ended with `player_death` after 655.18 seconds.
+- Snowflake and Athena returned the same Gold comparison result.
+- Local Airflow completed the date-scoped Bronze-to-report DAG.
+- Bedrock Nova Micro generated one English Markdown report with 3,259 total tokens.
+- The report was stored under `ai-reports/report_date=2026-09-04/report.md`.
 
-Re-run the full suite on Python 3.12 after changing the contract.
+See the [E2E evidence](docs/e2e-validation-2026-09-04.md) for the observed counts, limitations, and shutdown
+state. Re-run the full suite on Python 3.12 after changing the contract.
