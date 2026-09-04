@@ -211,3 +211,18 @@ variable "ingestion_api_burst_limit" {
     error_message = "API burst 제한은 rate 제한 이상이며 200 이하의 정수여야 합니다."
   }
 }
+
+variable "snowflake_iam_user_arn" {
+  description = "Snowflake가 제공하는 AWS IAM 사용자 ARN"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "snowflake_external_ids" {
+  description = "Snowflake External Volume과 Glue Catalog Integration의 External ID 목록"
+  type        = list(string)
+  default     = []
+  nullable    = false
+  sensitive   = true
+}
