@@ -14,6 +14,7 @@ from .bedrock import (
     create_bedrock_runtime_client,
     generate_gold_report,
 )
+from .runner import generate_report_from_athena
 
 __all__ = [
     "BEDROCK_MODEL_ID",
@@ -25,5 +26,6 @@ __all__ = [
     "build_gold_report_input",
     "create_bedrock_runtime_client",
     "generate_gold_report",
+    "generate_report_from_athena",
     "validate_gold_report_input",
 ]
