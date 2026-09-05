@@ -63,6 +63,23 @@ CONSENTED_PROD_PLAY
 | Bedrock Nova Micro | One English report from approved aggregate metrics per DAG run |
 | S3 AI report | Date-partitioned Markdown output; the same date is overwritten |
 
+## Why Snowflake and Athena are both used
+
+Game-version comparison does not technically require Snowflake; Athena can aggregate the same Iceberg data.
+PANDOK uses Snowflake as the primary analytical workspace because the developer needs to repeatedly narrow
+questions by game version, map, starting weapon, gameplay interval, and upgrade selection. This interactive
+exploration role is separate from storage: Silver and Gold remain in S3 Iceberg rather than being locked into
+Snowflake-only tables.
+
+Athena is the independent validation engine. It reads the same Glue-cataloged Gold Iceberg tables and checks
+defined core metrics after important transformations or releases, rather than duplicating every exploratory
+Snowflake query. This separation gives Snowflake the analysis role and Athena the reproducibility role.
+
+The same boundary supports a future natural-language analytics interface. Bedrock can translate a developer's
+question into an allow-listed metric and filter specification, while a deterministic query layer executes the
+aggregation against trusted Gold data. Bedrock explains the returned result; it does not calculate or invent
+the metric itself.
+
 ## Implementation sequence
 
 1. Finalize the P0 contract.
