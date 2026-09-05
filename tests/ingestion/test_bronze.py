@@ -48,6 +48,21 @@ def test_build_bronze_record_preserves_original_event() -> None:
     assert record["event"]["payload"]["current_gold"] == 100
 
 
+# 허용된 사망 원인이 Bronze 원본 이벤트에서 손실되지 않는지 확인한다.
+def test_build_bronze_record_preserves_death_cause() -> None:
+    record = build_bronze_record(
+        {
+            "source_type": "CONTROLLED_SCENARIO",
+            "event_name": "run_ended",
+            "end_reason": "player_death",
+            "death_cause": "fall",
+        },
+        "scenario_generator",
+    )
+
+    assert record["event"]["death_cause"] == "fall"
+
+
 # 등록되지 않은 수집 경로를 거부하는지 확인한다.
 def test_build_bronze_record_rejects_unknown_channel() -> None:
     with pytest.raises(ValueError, match="Unsupported ingestion_channel"):

@@ -52,3 +52,31 @@ def test_writes_reconstructed_events_to_parquet(
             "schema_version",
         }
     }
+
+
+def test_preserves_optional_death_cause_in_event_payload(
+    anonymous_sequence,
+    tmp_path,
+):
+    events = [dict(event) for event in anonymous_sequence]
+    ended_event = next(
+        event for event in events if event["event_name"] == "run_ended"
+    )
+    ended_event["death_cause"] = "enemy_damage"
+    bronze_records = [
+        build_bronze_record(
+            event,
+            "turkiye_gateway",
+            received_at=datetime(2026, 9, 5, tzinfo=timezone.utc),
+        )
+        for event in events
+    ]
+    output_path = tmp_path / "silver-death-cause.parquet"
+
+    write_silver_parquet(reconstruct_runs(bronze_records), output_path)
+
+    rows = pq.read_table(output_path).to_pylist()
+    silver_end = next(row for row in rows if row["event_name"] == "run_ended")
+    assert json.loads(silver_end["event_payload_json"])["death_cause"] == (
+        "enemy_damage"
+    )
