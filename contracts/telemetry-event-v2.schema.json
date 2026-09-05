@@ -301,6 +301,15 @@
                 "unknown"
               ]
             },
+            "death_cause": {
+              "$comment": "Optional bounded cause for player_death only; omitted by compatible older clients.",
+              "enum": [
+                "enemy_damage",
+                "fall",
+                "environmental_hazard",
+                "unknown"
+              ]
+            },
             "final_level": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_kills": {"$ref": "#/$defs/nonNegativeInteger"},
             "total_xp_collected": {"$ref": "#/$defs/nonNegativeNumber"},
@@ -315,6 +324,14 @@
               "type": "array",
               "maxItems": 64,
               "items": {"$ref": "#/$defs/upgradeState"}
+            }
+          },
+          "dependentSchemas": {
+            "death_cause": {
+              "properties": {
+                "end_reason": {"const": "player_death"}
+              },
+              "required": ["end_reason"]
             }
           }
         }
