@@ -6,8 +6,10 @@ and generates developer-facing game improvement reports from verified Gold metri
 
 ## Current status
 
-The P0 path has been implemented and verified with one consented production Run. PANDOK v2 is the only
-AWS-bound event contract and follows the active [Privacy-by-Design baseline](docs/privacy-by-design.md).
+The P0 path has been implemented and verified end to end. The first execution traced one consented production
+Run through the entire pipeline, and the later Run Summary verification produced 27 rows for 27 distinct Runs.
+PANDOK v2 is the only AWS-bound event contract and follows the active
+[Privacy-by-Design baseline](docs/privacy-by-design.md).
 
 Supported P0 events:
 
@@ -39,6 +41,17 @@ storage/catalog resources remain stable, so the developer-facing endpoint does n
 
 See [architecture](docs/architecture.md), [project scope](docs/project-scope.md), and the
 [event contract](docs/event-contract.md) for the active project documentation.
+
+## Analytics status
+
+- `PRODUCT_RUN_SUMMARY` converts many Silver event rows into one row per consented Run. Its one-row-per-Run
+  invariant has been verified with 27 Runs.
+- Existing Gold tables describe Run outcomes, checkpoint state, upgrade exposure and selection, and pipeline
+  quality.
+- Run progression and post-selection upgrade Gold have been loaded and queried from Athena. Their compact
+  Snowflake-Athena reconciliation is implemented and waiting for one final DAG validation.
+- Post-selection metrics are descriptive associations, not proof that an upgrade caused an outcome.
+- Confidence intervals, time-aware survival analysis, and randomized A/B tests are future improvements.
 
 ## Privacy boundary
 
@@ -111,6 +124,7 @@ The repository records the following baseline from 2026-09-04:
 - Local Airflow completed the date-scoped Bronze-to-report DAG.
 - Bedrock Nova Micro generated one English Markdown report with 3,259 total tokens.
 - The report was stored under `ai-reports/report_date=2026-09-04/report.md`.
+- A later Gold Run Summary check returned 27 rows and 27 distinct `run_id` values, confirming its Run grain.
 
 See the [E2E evidence](docs/e2e-validation-2026-09-04.md) for the observed counts, limitations, and shutdown
 state. Re-run the full suite on Python 3.12 after changing the contract.

@@ -1,7 +1,8 @@
 # PANDOK Architecture
 
-This document describes the architecture implemented and verified on 2026-09-04. The Türkiye Gateway is
-the privacy boundary; the Game Client does not connect directly to AWS.
+This document describes the architecture verified on 2026-09-04 and the later Gold extensions whose validation
+status is identified below. The Türkiye Gateway is the privacy boundary; the Game Client does not connect
+directly to AWS.
 
 ## Target flow
 
@@ -33,7 +34,10 @@ CONSENTED_PROD_PLAY
       |
  Athena -> Glue Data Catalog -> Silver Iceberg
       |
- Snowflake reads Silver and creates Gold Iceberg in S3/Glue
+ Snowflake reads Silver and creates Run-level Gold views
+ Run Summary + progression + outcome + upgrade metrics
+          |
+ Gold Iceberg in S3/Glue
       |
  Snowflake result <-> Athena result reconciliation
       |
@@ -63,6 +67,32 @@ CONSENTED_PROD_PLAY
 | Bedrock Nova Micro | One English report from approved aggregate metrics per DAG run |
 | S3 AI report | Date-partitioned Markdown output; the same date is overwritten |
 
+## Analytics layers
+
+The first Gold responsibility is to establish a stable analysis grain. `RUN_SUMMARY` reduces the many Silver
+events in one Run to one row containing its version, starting condition, observed progress, final outcome,
+activity counts, and quality metadata. `PRODUCT_RUN_SUMMARY` then excludes controlled and load-test traffic.
+The one-row-per-Run invariant has been verified with 27 product Runs. `map_id` is retained for traceability and
+future expansion, but it is not currently used as a comparison dimension because the observed game data has one
+map.
+
+The current and pending descriptive metrics have separate purposes:
+
+| Gold result | Question answered | Status |
+|---|---|---|
+| `PRODUCT_RUN_SUMMARY` | What happened in each Run? | Implemented and Run grain verified |
+| `PRODUCT_RUN_OUTCOME` | Why and when did Runs end? | Implemented and E2E verified |
+| `PRODUCT_CHECKPOINT_METRICS` | What was the average state among Runs reaching a checkpoint? | Implemented and E2E verified |
+| `PRODUCT_UPGRADE_FUNNEL` | Which displayed options were selected? | Implemented and E2E verified |
+| `PRODUCT_RUN_PROGRESSION` | What percentage reached each 60-second checkpoint, and where did it drop? | Loaded and queried; automatic reconciliation validation pending |
+| `PRODUCT_UPGRADE_POST_SELECTION` | What outcomes followed the first selection of an item at each selection minute? | Run-item de-weighting loaded; automatic reconciliation validation pending |
+
+Post-selection metrics are associations. A late upgrade naturally has less observable time remaining, repeated
+selections can overweight one Run, and multiple active upgrades make single-item attribution unreliable. The
+current view groups results by first-selection minute, applies final outcomes once per Run and item, and marks
+groups below 30 Runs as `INSUFFICIENT_SAMPLE`. A planned validation layer can additionally use time-varying
+survival analysis. It is an optional manual or periodic analysis after Gold, not another always-on service.
+
 ## Why Snowflake and Athena are both used
 
 Game-version comparison does not technically require Snowflake; Athena can aggregate the same Iceberg data.
@@ -79,6 +109,18 @@ The same boundary supports a future natural-language analytics interface. Bedroc
 question into an allow-listed metric and filter specification, while a deterministic query layer executes the
 aggregation against trusted Gold data. Bedrock explains the returned result; it does not calculate or invent
 the metric itself.
+
+## Future analytical validation and experiments
+
+PANDOK can later add a local Python survival-analysis task after the descriptive Gold transformation. A
+time-varying model can account for when each upgrade became active, multiple upgrades in one Run, death events,
+and incomplete or non-death endings. The output must retain sample sizes and an insufficient-sample status, and
+it must not present association as causation.
+
+A randomized A/B test is a separate future capability. It requires Unity to assign and apply a stable variant
+before a Run begins and to send allow-listed `experiment_id` and `variant_id` values. Until that contract and game
+logic exist, PANDOK uses `game_version` for observational patch comparisons only. A/B fields are not part of the
+current v2 contract and must not be added to production events without a contract revision and developer review.
 
 ## Implementation sequence
 
@@ -104,6 +146,7 @@ one Run.
 - Bronze stores accepted source records, including retries.
 - Silver contains schema-valid, deduplicated records; invalid or conflicting Runs go to Quarantine.
 - Product Gold filters to `CONSENTED_PROD_PLAY`.
+- Snowflake and Athena compare compact count summaries for Run quality, progression, and post-selection Gold.
 - Bedrock is blocked when Snowflake/Athena reconciliation or Gold quality checks fail.
 - AI output is advisory and never the source of record.
 

@@ -35,6 +35,8 @@ bodies.
 - Silver deduplicates retries and reconstructs Runs by `event_sequence`.
 - Missing events remain `INCOMPLETE`; conflicting data becomes `INVALID`.
 - Gold uses only valid or explicitly approved completeness states.
+- `run_ended` may include the bounded `death_cause` only when `end_reason` is
+  `player_death`; omission remains valid for older compatible clients.
 
 `aggregate-export-v1` is an optional comparison contract and does not replace
 the PANDOK v2 event flow.

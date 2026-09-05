@@ -18,6 +18,8 @@ retry-prone events into trusted Run analytics, and provide traceable improvement
 - Local Airflow manual orchestration, quality checks, and date-scoped backfills
 - One English Bedrock report per successful DAG run, using validated Gold metrics only
 - At least one consented Steam beta Run traced end to end
+- One-row-per-Run Gold summary for reusable gameplay analysis
+- Descriptive checkpoint progression and post-selection upgrade metrics
 
 ## Data sources
 
@@ -40,6 +42,27 @@ producer is authorized to use the supplied value.
 - Unapproved high-cost AWS resources such as NAT Gateway or MWAA
 - Managed Flink and continuously scheduled Airflow runs
 - Autonomous game changes based on AI output
+- Claiming that an observed upgrade association proves a causal balance effect
+- Randomized A/B assignment in the current Unity build and v2 event contract
+
+## Analytics boundary
+
+Gold provides reproducible descriptive evidence for developer decisions. It can show where Run progression
+drops, which choices are popular, and what outcomes follow a choice, but it cannot independently prove that one
+upgrade caused the outcome. Each decision-facing metric must retain its denominator and sample count, separate
+incomplete outcomes, and avoid mixing controlled or load-test traffic with product play.
+
+The current Run Summary grain has been verified with 27 rows for 27 distinct Runs. Run progression and the
+selection-stage, Run-item-weighted post-selection transformation have been loaded and queried from Athena.
+Compact Snowflake-Athena count reconciliation for both datasets is implemented and awaits one final DAG run.
+
+## Future improvements
+
+- Add minimum-sample and confidence-interval reporting before developer-facing conclusions.
+- Run time-varying survival analysis locally or periodically to account for upgrade timing and combinations.
+- Compare future `game_version` values as observational patch cohorts.
+- Add randomized A/B tests only after Unity supports stable variant assignment and the event contract explicitly
+  defines `experiment_id` and `variant_id`.
 
 ## Completion criteria
 

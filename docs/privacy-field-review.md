@@ -86,6 +86,7 @@ to a player, account, installation, or device.
 | `active_upgrades` | Checkpoint array | Captures the current build | Rare combinations can strongly fingerprint a Run | `MODIFY` | Keep approved IDs with an explicit item limit and never join across Runs |
 | `final_upgrades` | Run-end array | Captures the final build | Rare combinations can strongly fingerprint a Run | `MODIFY` | Keep approved IDs with an explicit item limit and aggregate before LLM use |
 | `end_reason` | Run end | Separates death, completion, quit, restart, and close | None when restricted to an enum | `KEEP` | Required outcome dimension |
+| `death_cause` | Optional player-death detail | Separates enemy, fall, and environmental deaths | Low when restricted to a bounded enum with no coordinates or source instance | `KEEP` | Required for actionable death analysis; allowed only with `end_reason=player_death` |
 | `run_duration_seconds` | Run end | Measures survival and completion duration | A precise value contributes to a Run fingerprint | `MODIFY` | Retain Run-relative duration at analysis-appropriate precision |
 | `final_level` | Run end | Measures progression reached | Low; Run state only | `KEEP` | Required survival and difficulty metric |
 

@@ -22,7 +22,7 @@ network identity, exact client timestamp, or free-form text fields.
 - `upgrade_selected`: selected option linked through `choice_id`
 - `run_started`: beginning of active gameplay
 - `run_checkpoint`: cumulative state at an active-play checkpoint
-- `run_ended`: final available cumulative Run state
+- `run_ended`: final available cumulative Run state and optional bounded death cause
 
 `session_started` is not an AWS-bound v2 event.
 
@@ -37,3 +37,5 @@ network identity, exact client timestamp, or free-form text fields.
 - Checkpoint numbers, relative time, and cumulative counters do not decrease.
 - Missing sequence values or a missing end produce an `INCOMPLETE` Run.
 - Conflicts and impossible ordering produce an `INVALID` Run.
+- `death_cause` accepts `enemy_damage`, `fall`, `environmental_hazard`, or `unknown`
+  only when `end_reason=player_death`; older events may omit it.
