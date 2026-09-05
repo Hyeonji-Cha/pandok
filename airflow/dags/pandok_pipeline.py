@@ -23,12 +23,13 @@ AWS_REGION = "ap-southeast-2"
 ATHENA_DATABASE = "pandok_dev"
 SNOWFLAKE_CONNECTION_ID = "snowflake_default"
 SQL_ROOT = Path("/opt/pandok/sql")
-QUALITY_COLUMNS = (
-    "run_count",
-    "input_event_count",
-    "unique_event_count",
-    "exact_retry_count",
-    "conflicting_duplicate_count",
+RECONCILIATION_COLUMNS = (
+    "row_count",
+    "metric_1_count",
+    "metric_2_count",
+    "metric_3_count",
+    "metric_4_count",
+    "metric_5_count",
 )
 
 
@@ -212,27 +213,25 @@ def pandok_bronze_to_gold() -> None:
 
     @task
     def query_snowflake_gold(silver_result: dict[str, Any]) -> list[dict[str, Any]]:
-        """Snowflake가 적재한 Run 품질 Gold 값을 비교 입력으로 조회한다."""
+        """Snowflake에서 품질·진행·업그레이드 Gold의 핵심 건수를 조회한다."""
 
         del silver_result
-        return _snowflake_rows(
-            "SELECT run_status, run_count, input_event_count, "
-            "unique_event_count, exact_retry_count, "
-            "conflicting_duplicate_count "
-            "FROM PANDOK_LAKEHOUSE.pandok_dev.gold_run_quality"
+        sql = _read_sql("reconcile_gold_metrics.sql").replace(
+            "__TABLE_PREFIX__",
+            "PANDOK_LAKEHOUSE.pandok_dev.",
         )
+        return _snowflake_rows(sql)
 
     @task
     def query_athena_gold(silver_result: dict[str, Any]) -> list[dict[str, Any]]:
-        """Athena가 같은 Gold Iceberg에서 읽은 값을 비교 입력으로 조회한다."""
+        """Athena에서 같은 Gold Iceberg의 핵심 건수를 조회한다."""
 
         del silver_result
-        return _athena_rows(
-            "SELECT run_status, run_count, input_event_count, "
-            "unique_event_count, exact_retry_count, "
-            "conflicting_duplicate_count "
-            "FROM pandok_dev.gold_run_quality"
+        sql = _read_sql("reconcile_gold_metrics.sql").replace(
+            "__TABLE_PREFIX__",
+            "pandok_dev.",
         )
+        return _athena_rows(sql)
 
     @task
     def reconcile_gold(
@@ -244,8 +243,8 @@ def pandok_bronze_to_gold() -> None:
         result = reconcile_metric_rows(
             snowflake_rows,
             athena_rows,
-            key_columns=("run_status",),
-            metric_columns=QUALITY_COLUMNS,
+            key_columns=("dataset_key",),
+            metric_columns=RECONCILIATION_COLUMNS,
         )
         if not result.matched:
             raise ValueError(f"Gold reconciliation failed: {result.differences}")

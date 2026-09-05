@@ -63,6 +63,48 @@ def test_reports_a_metric_value_mismatch():
     assert result.differences[0].reason == "value_mismatch"
 
 
+def test_matches_multiple_gold_dataset_summaries():
+    metric_columns = (
+        "row_count",
+        "metric_1_count",
+        "metric_2_count",
+    )
+    result = reconcile_metric_rows(
+        [
+            {
+                "DATASET_KEY": "run_progression",
+                "ROW_COUNT": 10,
+                "METRIC_1_COUNT": 27,
+                "METRIC_2_COUNT": 20,
+            },
+            {
+                "DATASET_KEY": "upgrade_post_selection",
+                "ROW_COUNT": 113,
+                "METRIC_1_COUNT": 200,
+                "METRIC_2_COUNT": 150,
+            },
+        ],
+        [
+            {
+                "dataset_key": "upgrade_post_selection",
+                "row_count": "113",
+                "metric_1_count": "200",
+                "metric_2_count": "150",
+            },
+            {
+                "dataset_key": "run_progression",
+                "row_count": "10",
+                "metric_1_count": "27",
+                "metric_2_count": "20",
+            },
+        ],
+        key_columns=("dataset_key",),
+        metric_columns=metric_columns,
+    )
+
+    assert result.matched
+
+
 def test_rejects_duplicate_metric_keys():
     with pytest.raises(
         GoldReconciliationInputError,
