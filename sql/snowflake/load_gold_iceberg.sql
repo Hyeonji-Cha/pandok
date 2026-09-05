@@ -6,6 +6,95 @@ USE WAREHOUSE PANDOK_WH;
 USE DATABASE PANDOK_LAKEHOUSE;
 USE SCHEMA pandok_dev;
 
+-- 실제 플레이의 여러 이벤트를 Run당 한 행으로 모은 공통 분석 기반을 보존한다.
+CREATE ICEBERG TABLE IF NOT EXISTS gold_run_summary (
+  run_id STRING,
+  received_date DATE,
+  source_type STRING,
+  game_version STRING,
+  run_status STRING,
+  is_started BOOLEAN,
+  is_ended BOOLEAN,
+  first_received_at TIMESTAMP_LTZ(6),
+  last_received_at TIMESTAMP_LTZ(6),
+  observed_run_seconds NUMBER(38, 6),
+  run_duration_seconds NUMBER(38, 6),
+  max_event_sequence NUMBER(38, 0),
+  map_id STRING,
+  starting_weapon_id STRING,
+  starting_max_hp NUMBER(38, 6),
+  end_reason STRING,
+  final_level NUMBER(38, 0),
+  total_kills NUMBER(38, 0),
+  total_xp_collected NUMBER(38, 6),
+  current_gold NUMBER(38, 6),
+  total_gold_collected NUMBER(38, 6),
+  hearts_collected NUMBER(38, 0),
+  total_healing_received NUMBER(38, 6),
+  magnets_collected NUMBER(38, 0),
+  miniboss_waves_reached NUMBER(38, 0),
+  miniboss_waves_cleared NUMBER(38, 0),
+  final_upgrade_count NUMBER(38, 0),
+  final_upgrades_json STRING,
+  checkpoint_count NUMBER(38, 0),
+  highest_checkpoint_number NUMBER(38, 0),
+  upgrade_shown_count NUMBER(38, 0),
+  upgrade_selected_count NUMBER(38, 0),
+  unselected_upgrade_count NUMBER(38, 0),
+  input_event_count NUMBER(38, 0),
+  unique_event_count NUMBER(38, 0),
+  exact_retry_count NUMBER(38, 0),
+  conflicting_duplicate_count NUMBER(38, 0),
+  quality_issue_count NUMBER(38, 0)
+)
+  BASE_LOCATION = 'gold/run_summary/'
+  TARGET_FILE_SIZE = '16MB'
+  ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED';
+
+DELETE FROM gold_run_summary;
+
+INSERT INTO gold_run_summary
+SELECT
+  run_id,
+  received_date,
+  source_type,
+  game_version,
+  run_status,
+  is_started,
+  is_ended,
+  first_received_at,
+  last_received_at,
+  observed_run_seconds,
+  run_duration_seconds,
+  max_event_sequence,
+  map_id,
+  starting_weapon_id,
+  starting_max_hp,
+  end_reason,
+  final_level,
+  total_kills,
+  total_xp_collected,
+  current_gold,
+  total_gold_collected,
+  hearts_collected,
+  total_healing_received,
+  magnets_collected,
+  miniboss_waves_reached,
+  miniboss_waves_cleared,
+  final_upgrade_count,
+  final_upgrades_json,
+  checkpoint_count,
+  highest_checkpoint_number,
+  upgrade_shown_count,
+  upgrade_selected_count,
+  unselected_upgrade_count,
+  input_event_count,
+  unique_event_count,
+  exact_retry_count,
+  conflicting_duplicate_count,
+  quality_issue_count
+FROM PANDOK.GOLD.PRODUCT_RUN_SUMMARY;
+
 -- 전체 Run의 검증 상태와 중복 품질을 보존한다.
 CREATE ICEBERG TABLE IF NOT EXISTS gold_run_quality (
   run_status STRING,

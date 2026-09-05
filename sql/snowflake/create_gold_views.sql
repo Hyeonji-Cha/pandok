@@ -8,6 +8,98 @@ USE WAREHOUSE PANDOK_WH;
 USE DATABASE PANDOK;
 USE SCHEMA GOLD;
 
+-- 여러 Silver 이벤트 행을 Run당 한 행으로 모아 후속 분석의 공통 기준을 만든다.
+-- map_id는 현재 단일 맵이므로 비교 지표로 사용하지 않고 향후 확장과 추적을 위해서만 보존한다.
+CREATE OR REPLACE VIEW RUN_SUMMARY AS
+WITH PARSED_EVENTS AS (
+  SELECT
+    *,
+    TRY_PARSE_JSON(event_payload_json) AS payload
+  FROM PANDOK.SILVER.SILVER_EVENTS
+),
+SUMMARIZED_RUNS AS (
+  SELECT
+    run_id,
+    MIN(received_date) AS received_date,
+    MAX(source_type) AS source_type,
+    MAX(game_version) AS game_version,
+    MAX(run_status) AS run_status,
+    COUNT_IF(event_name = 'run_started') > 0 AS is_started,
+    COUNT_IF(event_name = 'run_ended') > 0 AS is_ended,
+    MIN(first_received_at) AS first_received_at,
+    MAX(first_received_at) AS last_received_at,
+    MAX(run_elapsed_seconds) AS observed_run_seconds,
+    MAX(IFF(event_name = 'run_ended', run_elapsed_seconds, NULL))
+      AS run_duration_seconds,
+    MAX(event_sequence) AS max_event_sequence,
+
+    -- 시작 조건은 run_started에서만 가져오며 없는 값은 임의로 채우지 않는다.
+    MAX(IFF(event_name = 'run_started', payload:map_id::STRING, NULL))
+      AS map_id,
+    MAX(IFF(event_name = 'run_started', payload:starting_weapon_id::STRING, NULL))
+      AS starting_weapon_id,
+    MAX(IFF(event_name = 'run_started', payload:starting_max_hp::FLOAT, NULL))
+      AS starting_max_hp,
+
+    -- 종료 결과는 run_ended가 없는 미완료 Run에서 NULL로 유지한다.
+    MAX(IFF(event_name = 'run_ended', payload:end_reason::STRING, NULL))
+      AS end_reason,
+    MAX(IFF(event_name = 'run_ended', payload:final_level::NUMBER, NULL))
+      AS final_level,
+    MAX(IFF(event_name = 'run_ended', payload:total_kills::NUMBER, NULL))
+      AS total_kills,
+    MAX(IFF(event_name = 'run_ended', payload:total_xp_collected::FLOAT, NULL))
+      AS total_xp_collected,
+    MAX(IFF(event_name = 'run_ended', payload:current_gold::FLOAT, NULL))
+      AS current_gold,
+    MAX(IFF(event_name = 'run_ended', payload:total_gold_collected::FLOAT, NULL))
+      AS total_gold_collected,
+    MAX(IFF(event_name = 'run_ended', payload:hearts_collected::NUMBER, NULL))
+      AS hearts_collected,
+    MAX(IFF(event_name = 'run_ended', payload:total_healing_received::FLOAT, NULL))
+      AS total_healing_received,
+    MAX(IFF(event_name = 'run_ended', payload:magnets_collected::NUMBER, NULL))
+      AS magnets_collected,
+    MAX(IFF(event_name = 'run_ended', payload:miniboss_waves_reached::NUMBER, NULL))
+      AS miniboss_waves_reached,
+    MAX(IFF(event_name = 'run_ended', payload:miniboss_waves_cleared::NUMBER, NULL))
+      AS miniboss_waves_cleared,
+    MAX(IFF(event_name = 'run_ended', ARRAY_SIZE(payload:final_upgrades), NULL))
+      AS final_upgrade_count,
+    MAX(IFF(event_name = 'run_ended', TO_JSON(payload:final_upgrades), NULL))
+      AS final_upgrades_json,
+
+    -- 이벤트 횟수는 Run의 행동량과 선택 미완료 여부를 빠르게 비교할 때 사용한다.
+    COUNT_IF(event_name = 'run_checkpoint') AS checkpoint_count,
+    MAX(IFF(event_name = 'run_checkpoint', payload:checkpoint_number::NUMBER, NULL))
+      AS highest_checkpoint_number,
+    COUNT_IF(event_name = 'upgrade_options_shown') AS upgrade_shown_count,
+    COUNT_IF(event_name = 'upgrade_selected') AS upgrade_selected_count,
+    GREATEST(
+      COUNT_IF(event_name = 'upgrade_options_shown')
+        - COUNT_IF(event_name = 'upgrade_selected'),
+      0
+    ) AS unselected_upgrade_count,
+
+    -- Run마다 반복 저장된 Silver 품질 metadata는 한 번만 남긴다.
+    MAX(input_event_count) AS input_event_count,
+    MAX(unique_event_count) AS unique_event_count,
+    MAX(exact_retry_count) AS exact_retry_count,
+    MAX(conflicting_duplicate_count) AS conflicting_duplicate_count,
+    MAX(COALESCE(ARRAY_SIZE(TRY_PARSE_JSON(quality_issues_json)), 0))
+      AS quality_issue_count
+  FROM PARSED_EVENTS
+  GROUP BY run_id
+)
+SELECT *
+FROM SUMMARIZED_RUNS;
+
+-- 운영 분석에 테스트 데이터가 섞이지 않도록 동의한 실제 플레이 Run만 분리한다.
+CREATE OR REPLACE VIEW PRODUCT_RUN_SUMMARY AS
+SELECT *
+FROM RUN_SUMMARY
+WHERE source_type = 'CONSENTED_PROD_PLAY';
+
 -- 이벤트 한 행마다 반복되는 Run 품질 값을 Run당 한 번만 집계한다.
 CREATE OR REPLACE VIEW RUN_QUALITY_SUMMARY AS
 WITH ONE_ROW_PER_RUN AS (
@@ -141,6 +233,25 @@ WITH CHECK_RESULTS AS (
      OR unique_event_count < 0
      OR exact_retry_count < 0
      OR conflicting_duplicate_count < 0
+
+  UNION ALL
+
+  SELECT
+    'run_summary_consistency',
+    COUNT(*)
+  FROM RUN_SUMMARY
+  WHERE (is_ended AND run_status <> 'valid')
+     OR (NOT is_ended AND run_status <> 'incomplete')
+     OR (is_ended AND (
+       end_reason IS NULL
+       OR run_duration_seconds IS NULL
+       OR final_level IS NULL
+       OR total_kills IS NULL
+       OR current_gold IS NULL
+     ))
+     OR upgrade_selected_count > upgrade_shown_count
+     OR input_event_count
+       <> unique_event_count + exact_retry_count + conflicting_duplicate_count
 
   UNION ALL
 
