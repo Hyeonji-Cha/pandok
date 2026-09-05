@@ -33,6 +33,32 @@ def _valid_sections():
         ],
         "checkpoint_metrics": [],
         "upgrade_funnel": [],
+        "run_progression": [
+            {
+                "GAME_VERSION": "0.1.0",
+                "CHECKPOINT_NUMBER": Decimal("2"),
+                "STARTED_RUN_COUNT": Decimal("27"),
+                "REACHED_RUN_COUNT": Decimal("19"),
+                "REACH_PERCENTAGE": Decimal("70.37"),
+                "STEP_DROPOFF_PERCENTAGE": Decimal("20.83"),
+            }
+        ],
+        "upgrade_post_selection": [
+            {
+                "GAME_VERSION": "0.1.0",
+                "CHOICE_SOURCE": "level_up_weapon",
+                "ITEM_ID": "sword",
+                "RARITY": "common",
+                "SELECTION_MINUTE": Decimal("1"),
+                "SELECTION_COUNT": Decimal("4"),
+                "SELECTED_RUN_COUNT": Decimal("3"),
+                "OUTCOME_OBSERVED_RUN_COUNT": Decimal("3"),
+                "AVERAGE_SECONDS_AFTER_SELECTION": Decimal("120.5"),
+                "DEATH_WITHIN_60_SECONDS_COUNT": Decimal("1"),
+                "DEATH_WITHIN_60_SECONDS_PERCENTAGE": Decimal("33.33"),
+                "ANALYSIS_STATUS": "INSUFFICIENT_SAMPLE",
+            }
+        ],
     }
 
 
@@ -41,6 +67,11 @@ def test_builds_bounded_payload_from_aggregate_gold_rows():
 
     assert payload["schema_version"] == "gold-report-input-v1"
     assert payload["metrics"]["run_outcomes"][0]["average_run_seconds"] == 655.18
+    assert payload["metrics"]["run_progression"][0]["started_run_count"] == 27
+    assert (
+        payload["metrics"]["upgrade_post_selection"][0]["analysis_status"]
+        == "INSUFFICIENT_SAMPLE"
+    )
 
     schema_path = (
         Path(__file__).parents[2]

@@ -32,6 +32,8 @@ def _report_input():
         run_outcomes=[],
         checkpoint_metrics=[],
         upgrade_funnel=[],
+        run_progression=[],
+        upgrade_post_selection=[],
     )
 
 
@@ -55,6 +57,7 @@ def test_generates_english_markdown_with_bounded_nova_request():
     assert client.request["modelId"] == BEDROCK_MODEL_ID
     assert client.request["inferenceConfig"]["maxTokens"] == MAX_OUTPUT_TOKENS
     assert "concise English Markdown" in client.request["system"][0]["text"]
+    assert "INSUFFICIENT_SAMPLE" in client.request["system"][0]["text"]
 
 
 def test_revalidates_payload_before_bedrock_call():

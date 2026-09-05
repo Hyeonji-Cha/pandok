@@ -53,6 +53,28 @@ _SECTION_QUERIES = {
         FROM gold_upgrade_funnel
         LIMIT 101
     """,
+    "run_progression": """
+        SELECT game_version, checkpoint_number, started_run_count,
+               reached_run_count, reach_percentage, step_dropoff_percentage
+        FROM gold_run_progression
+        ORDER BY step_dropoff_percentage DESC, game_version, checkpoint_number
+        LIMIT 20
+    """,
+    "upgrade_post_selection": """
+        SELECT game_version, choice_source, item_id, rarity, selection_minute,
+               selection_count, selected_run_count, outcome_observed_run_count,
+               average_seconds_after_selection,
+               death_within_60_seconds_count,
+               death_within_60_seconds_percentage, analysis_status
+        FROM gold_upgrade_post_selection
+        WHERE outcome_observed_run_count > 0
+        ORDER BY
+          CASE analysis_status WHEN 'DESCRIPTIVE_ONLY' THEN 0 ELSE 1 END,
+          selected_run_count DESC,
+          game_version,
+          item_id
+        LIMIT 20
+    """,
 }
 
 
@@ -173,7 +195,7 @@ def generate_report_from_athena(
     athena_client: AthenaClient | None = None,
     bedrock_client: BedrockRuntimeClient | None = None,
 ) -> ReportGenerationResult:
-    """Gold 네 섹션을 제한 조회하고 Nova Micro 영어 보고서를 한 번 생성한다."""
+    """Gold 여섯 섹션을 제한 조회하고 Nova Micro 영어 보고서를 한 번 생성한다."""
 
     client = athena_client or create_athena_client()
     sections: dict[str, list[dict[str, Any]]] = {}
@@ -192,6 +214,8 @@ def generate_report_from_athena(
         run_outcomes=sections["run_outcomes"],
         checkpoint_metrics=sections["checkpoint_metrics"],
         upgrade_funnel=sections["upgrade_funnel"],
+        run_progression=sections["run_progression"],
+        upgrade_post_selection=sections["upgrade_post_selection"],
     )
     return generate_gold_report(report_input, bedrock_client=bedrock_client)
 

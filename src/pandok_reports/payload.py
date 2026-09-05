@@ -47,6 +47,28 @@ _SECTION_COLUMNS = {
         "selection_count",
         "selection_percentage",
     ),
+    "run_progression": (
+        "game_version",
+        "checkpoint_number",
+        "started_run_count",
+        "reached_run_count",
+        "reach_percentage",
+        "step_dropoff_percentage",
+    ),
+    "upgrade_post_selection": (
+        "game_version",
+        "choice_source",
+        "item_id",
+        "rarity",
+        "selection_minute",
+        "selection_count",
+        "selected_run_count",
+        "outcome_observed_run_count",
+        "average_seconds_after_selection",
+        "death_within_60_seconds_count",
+        "death_within_60_seconds_percentage",
+        "analysis_status",
+    ),
 }
 
 _SECTION_ROW_LIMITS = {
@@ -54,6 +76,9 @@ _SECTION_ROW_LIMITS = {
     "run_outcomes": 6,
     "checkpoint_metrics": 50,
     "upgrade_funnel": 100,
+    # 보고서에는 이탈이 큰 구간과 대표 업그레이드만 전달해 입력 토큰을 제한한다.
+    "run_progression": 20,
+    "upgrade_post_selection": 20,
 }
 
 
@@ -125,8 +150,10 @@ def build_gold_report_input(
     run_outcomes: Iterable[Mapping[str, Any]],
     checkpoint_metrics: Iterable[Mapping[str, Any]],
     upgrade_funnel: Iterable[Mapping[str, Any]],
+    run_progression: Iterable[Mapping[str, Any]],
+    upgrade_post_selection: Iterable[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """허용된 네 종류의 Gold 집계만 크기 제한이 있는 Bedrock 입력으로 만든다."""
+    """허용된 여섯 종류의 Gold 집계만 크기 제한이 있는 Bedrock 입력으로 만든다."""
 
     try:
         parsed_date = date.fromisoformat(report_date)
@@ -146,6 +173,14 @@ def build_gold_report_input(
                 checkpoint_metrics,
             ),
             "upgrade_funnel": _normalize_section("upgrade_funnel", upgrade_funnel),
+            "run_progression": _normalize_section(
+                "run_progression",
+                run_progression,
+            ),
+            "upgrade_post_selection": _normalize_section(
+                "upgrade_post_selection",
+                upgrade_post_selection,
+            ),
         },
     }
 
@@ -179,4 +214,6 @@ def validate_gold_report_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         run_outcomes=metrics["run_outcomes"],
         checkpoint_metrics=metrics["checkpoint_metrics"],
         upgrade_funnel=metrics["upgrade_funnel"],
+        run_progression=metrics["run_progression"],
+        upgrade_post_selection=metrics["upgrade_post_selection"],
     )

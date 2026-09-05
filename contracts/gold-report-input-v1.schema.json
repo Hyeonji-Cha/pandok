@@ -16,7 +16,9 @@
         "run_quality",
         "run_outcomes",
         "checkpoint_metrics",
-        "upgrade_funnel"
+        "upgrade_funnel",
+        "run_progression",
+        "upgrade_post_selection"
       ],
       "properties": {
         "run_quality": {
@@ -38,6 +40,16 @@
           "type": "array",
           "maxItems": 100,
           "items": {"$ref": "#/$defs/upgradeMetric"}
+        },
+        "run_progression": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {"$ref": "#/$defs/runProgression"}
+        },
+        "upgrade_post_selection": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {"$ref": "#/$defs/upgradePostSelection"}
         }
       }
     }
@@ -125,6 +137,58 @@
         "exposure_count": {"$ref": "#/$defs/nonNegativeInteger"},
         "selection_count": {"$ref": "#/$defs/nonNegativeInteger"},
         "selection_percentage": {"$ref": "#/$defs/percentage"}
+      }
+    },
+    "runProgression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "game_version",
+        "checkpoint_number",
+        "started_run_count",
+        "reached_run_count",
+        "reach_percentage",
+        "step_dropoff_percentage"
+      ],
+      "properties": {
+        "game_version": {"$ref": "#/$defs/shortLabel"},
+        "checkpoint_number": {"$ref": "#/$defs/nonNegativeInteger"},
+        "started_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "reached_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "reach_percentage": {"$ref": "#/$defs/percentage"},
+        "step_dropoff_percentage": {"$ref": "#/$defs/percentage"}
+      }
+    },
+    "upgradePostSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "game_version",
+        "choice_source",
+        "item_id",
+        "rarity",
+        "selection_minute",
+        "selection_count",
+        "selected_run_count",
+        "outcome_observed_run_count",
+        "average_seconds_after_selection",
+        "death_within_60_seconds_count",
+        "death_within_60_seconds_percentage",
+        "analysis_status"
+      ],
+      "properties": {
+        "game_version": {"$ref": "#/$defs/shortLabel"},
+        "choice_source": {"$ref": "#/$defs/shortLabel"},
+        "item_id": {"$ref": "#/$defs/shortLabel"},
+        "rarity": {"$ref": "#/$defs/shortLabel"},
+        "selection_minute": {"$ref": "#/$defs/nonNegativeInteger"},
+        "selection_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "selected_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "outcome_observed_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "average_seconds_after_selection": {"$ref": "#/$defs/nonNegativeNumber"},
+        "death_within_60_seconds_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "death_within_60_seconds_percentage": {"$ref": "#/$defs/percentage"},
+        "analysis_status": {"enum": ["INSUFFICIENT_SAMPLE", "DESCRIPTIVE_ONLY"]}
       }
     }
   }

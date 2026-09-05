@@ -1,5 +1,5 @@
 # Athena Gold 조회부터 Bedrock 보고서 반환까지 연결되는지 가짜 AWS 응답으로 검증한다.
-# 네 번의 제한 조회와 단 한 번의 모델 호출 원칙을 실제 비용 없이 확인하기 위해 필요하다.
+# 여섯 번의 제한 조회와 단 한 번의 모델 호출 원칙을 실제 비용 없이 확인하기 위해 필요하다.
 
 from pandok_reports import generate_report_from_athena
 
@@ -58,7 +58,7 @@ def _empty_result_page():
     }
 
 
-def test_queries_four_bounded_gold_sections_and_invokes_bedrock_once():
+def test_queries_six_bounded_gold_sections_and_invokes_bedrock_once():
     athena = FakeAthenaClient()
     bedrock = FakeBedrockClient()
 
@@ -69,7 +69,7 @@ def test_queries_four_bounded_gold_sections_and_invokes_bedrock_once():
     )
 
     assert result.total_tokens == 162
-    assert len(athena.started_queries) == 4
+    assert len(athena.started_queries) == 6
     assert all("LIMIT" in query["QueryString"] for query in athena.started_queries)
     assert all(query["WorkGroup"] == "pandok-dev" for query in athena.started_queries)
     assert len(bedrock.requests) == 1
