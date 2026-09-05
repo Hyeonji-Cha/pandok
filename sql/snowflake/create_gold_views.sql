@@ -44,6 +44,8 @@ SUMMARIZED_RUNS AS (
     -- 종료 결과는 run_ended가 없는 미완료 Run에서 NULL로 유지한다.
     MAX(IFF(event_name = 'run_ended', payload:end_reason::STRING, NULL))
       AS end_reason,
+    MAX(IFF(event_name = 'run_ended', payload:death_cause::STRING, NULL))
+      AS death_cause,
     MAX(IFF(event_name = 'run_ended', payload:final_level::NUMBER, NULL))
       AS final_level,
     MAX(IFF(event_name = 'run_ended', payload:total_kills::NUMBER, NULL))
@@ -170,6 +172,183 @@ SELECT
 FROM CHECKPOINTS
 GROUP BY checkpoint_number;
 
+-- 시작 Run 대비 60초 체크포인트별 도달률과 직전 구간 이탈률을 계산한다.
+-- 최고 도달 번호를 사용해 중간 체크포인트 이벤트가 빠져도 실제 진행 구간을 보수적으로 복원한다.
+CREATE OR REPLACE VIEW PRODUCT_RUN_PROGRESSION AS
+WITH RECURSIVE VERSION_STARTS AS (
+  SELECT
+    game_version,
+    COUNT(*) AS started_run_count,
+    MAX(highest_checkpoint_number) AS max_checkpoint_number
+  FROM PRODUCT_RUN_SUMMARY
+  WHERE is_started
+  GROUP BY game_version
+),
+CHECKPOINT_NUMBERS (
+  game_version,
+  checkpoint_number,
+  max_checkpoint_number
+) AS (
+  SELECT
+    game_version,
+    1,
+    max_checkpoint_number
+  FROM VERSION_STARTS
+  WHERE max_checkpoint_number >= 1
+
+  UNION ALL
+
+  SELECT
+    game_version,
+    checkpoint_number + 1,
+    max_checkpoint_number
+  FROM CHECKPOINT_NUMBERS
+  WHERE checkpoint_number < max_checkpoint_number
+),
+REACH_COUNTS AS (
+  SELECT
+    checkpoints.game_version,
+    checkpoints.checkpoint_number,
+    starts.started_run_count,
+    COUNT_IF(
+      runs.highest_checkpoint_number >= checkpoints.checkpoint_number
+    ) AS reached_run_count
+  FROM CHECKPOINT_NUMBERS AS checkpoints
+  INNER JOIN VERSION_STARTS AS starts
+    ON checkpoints.game_version = starts.game_version
+  LEFT JOIN PRODUCT_RUN_SUMMARY AS runs
+    ON checkpoints.game_version = runs.game_version
+    AND runs.is_started
+  GROUP BY
+    checkpoints.game_version,
+    checkpoints.checkpoint_number,
+    starts.started_run_count
+),
+WITH_PREVIOUS_REACH AS (
+  SELECT
+    *,
+    COALESCE(
+      LAG(reached_run_count) OVER (
+        PARTITION BY game_version
+        ORDER BY checkpoint_number
+      ),
+      started_run_count
+    ) AS previous_reached_run_count
+  FROM REACH_COUNTS
+)
+SELECT
+  game_version,
+  checkpoint_number,
+  checkpoint_number AS elapsed_minutes,
+  started_run_count,
+  reached_run_count,
+  ROUND(
+    100.0 * reached_run_count / NULLIF(started_run_count, 0),
+    2
+  ) AS reach_percentage,
+  previous_reached_run_count,
+  ROUND(
+    100.0 * (previous_reached_run_count - reached_run_count)
+      / NULLIF(previous_reached_run_count, 0),
+    2
+  ) AS step_dropoff_percentage
+FROM WITH_PREVIOUS_REACH;
+
+-- 같은 아이템의 최초 선택 시점부터 Run 종료까지의 성과를 연결한다.
+-- Run·아이템당 한 번만 최종 성과를 반영해 반복 획득이 결과를 과도하게 가중하지 않게 한다.
+CREATE OR REPLACE VIEW PRODUCT_UPGRADE_POST_SELECTION AS
+WITH PARSED_SELECTIONS AS (
+  SELECT
+    run_id,
+    game_version,
+    event_sequence,
+    run_elapsed_seconds AS selected_at_seconds,
+    TRY_PARSE_JSON(event_payload_json):choice_source::STRING AS choice_source,
+    TRY_PARSE_JSON(event_payload_json):selected_item_id::STRING AS item_id,
+    TRY_PARSE_JSON(event_payload_json):selected_rarity::STRING AS rarity
+  FROM PANDOK.SILVER.SILVER_EVENTS
+  WHERE source_type = 'CONSENTED_PROD_PLAY'
+    AND event_name = 'upgrade_selected'
+),
+RANKED_SELECTIONS AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY run_id, item_id
+      ORDER BY selected_at_seconds, event_sequence
+    ) AS item_selection_number
+  FROM PARSED_SELECTIONS
+),
+RUN_ITEM_SELECTIONS AS (
+  SELECT
+    run_id,
+    MAX(game_version) AS game_version,
+    MAX(IFF(item_selection_number = 1, choice_source, NULL)) AS choice_source,
+    item_id,
+    MAX(IFF(item_selection_number = 1, rarity, NULL)) AS rarity,
+    MIN(selected_at_seconds) AS first_selected_at_seconds,
+    FLOOR(MIN(selected_at_seconds) / 60) AS selection_minute,
+    COUNT(*) AS selection_count_in_run
+  FROM RANKED_SELECTIONS
+  GROUP BY run_id, item_id
+),
+SELECTION_OUTCOMES AS (
+  SELECT
+    selections.*,
+    runs.is_ended,
+    runs.end_reason,
+    runs.final_level,
+    runs.total_kills,
+    IFF(
+      runs.is_ended,
+      GREATEST(
+        runs.run_duration_seconds - selections.first_selected_at_seconds,
+        0
+      ),
+      NULL
+    ) AS seconds_after_selection
+  FROM RUN_ITEM_SELECTIONS AS selections
+  INNER JOIN PRODUCT_RUN_SUMMARY AS runs
+    ON selections.run_id = runs.run_id
+)
+SELECT
+  game_version,
+  choice_source,
+  item_id,
+  rarity,
+  selection_minute,
+  SUM(selection_count_in_run) AS selection_count,
+  COUNT(*) AS selected_run_count,
+  COUNT_IF(is_ended) AS outcome_observed_run_count,
+  ROUND(AVG(seconds_after_selection), 2) AS average_seconds_after_selection,
+  COUNT_IF(
+    is_ended
+    AND end_reason = 'player_death'
+    AND seconds_after_selection <= 60
+  ) AS death_within_60_seconds_count,
+  ROUND(
+    100.0 * COUNT_IF(
+      is_ended
+      AND end_reason = 'player_death'
+      AND seconds_after_selection <= 60
+    ) / NULLIF(COUNT_IF(is_ended), 0),
+    2
+  ) AS death_within_60_seconds_percentage,
+  ROUND(AVG(IFF(is_ended, final_level, NULL)), 2) AS average_final_level,
+  ROUND(AVG(IFF(is_ended, total_kills, NULL)), 2) AS average_total_kills,
+  IFF(
+    COUNT(*) < 30,
+    'INSUFFICIENT_SAMPLE',
+    'DESCRIPTIVE_ONLY'
+  ) AS analysis_status
+FROM SELECTION_OUTCOMES
+GROUP BY
+  game_version,
+  choice_source,
+  item_id,
+  rarity,
+  selection_minute;
+
 -- 노출 선택지를 행으로 펼친 뒤 실제 선택과 연결해 아이템 선택률을 계산한다.
 CREATE OR REPLACE VIEW PRODUCT_UPGRADE_FUNNEL AS
 WITH SHOWN_EVENTS AS (
@@ -249,6 +428,7 @@ WITH CHECK_RESULTS AS (
        OR total_kills IS NULL
        OR current_gold IS NULL
      ))
+     OR (death_cause IS NOT NULL AND end_reason <> 'player_death')
      OR upgrade_selected_count > upgrade_shown_count
      OR input_event_count
        <> unique_event_count + exact_retry_count + conflicting_duplicate_count
@@ -279,6 +459,45 @@ WITH CHECK_RESULTS AS (
      OR average_hp_percent > 100
      OR average_total_kills < 0
      OR average_current_gold < 0
+
+  UNION ALL
+
+  SELECT
+    'run_progression_ranges',
+    COUNT(*)
+  FROM PRODUCT_RUN_PROGRESSION
+  WHERE checkpoint_number < 1
+     OR elapsed_minutes <> checkpoint_number
+     OR started_run_count < 1
+     OR reached_run_count < 0
+     OR reached_run_count > previous_reached_run_count
+     OR previous_reached_run_count > started_run_count
+     OR reach_percentage < 0
+     OR reach_percentage > 100
+     OR step_dropoff_percentage < 0
+     OR step_dropoff_percentage > 100
+
+  UNION ALL
+
+  SELECT
+    'upgrade_post_selection_ranges',
+    COUNT(*)
+  FROM PRODUCT_UPGRADE_POST_SELECTION
+  WHERE selection_count < 1
+     OR selected_run_count < 1
+     OR selected_run_count > selection_count
+     OR outcome_observed_run_count < 0
+     OR outcome_observed_run_count > selected_run_count
+     OR death_within_60_seconds_count < 0
+     OR death_within_60_seconds_count > outcome_observed_run_count
+     OR death_within_60_seconds_percentage < 0
+     OR death_within_60_seconds_percentage > 100
+     OR average_seconds_after_selection < 0
+     OR average_final_level < 0
+     OR average_total_kills < 0
+     OR analysis_status NOT IN ('INSUFFICIENT_SAMPLE', 'DESCRIPTIVE_ONLY')
+     OR (selected_run_count < 30 AND analysis_status <> 'INSUFFICIENT_SAMPLE')
+     OR (selected_run_count >= 30 AND analysis_status <> 'DESCRIPTIVE_ONLY')
 
   UNION ALL
 
