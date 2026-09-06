@@ -119,7 +119,11 @@ def _snowflake_rows(sql: str) -> list[dict[str, Any]]:
     catchup=False,
     max_active_runs=1,
     default_args={"retries": 0},
-    params={"received_date": ""},
+    params={
+        "received_date": "",
+        # 비용이 발생하는 AI 보고서는 실행 설정에서 명시적으로 켠 경우에만 생성한다.
+        "enable_bedrock_report": False,
+    },
     tags=["pandok", "telemetry"],
 )
 def pandok_bronze_to_gold() -> None:
@@ -260,6 +264,13 @@ def pandok_bronze_to_gold() -> None:
         _reconciliation_complete: None,
     ) -> dict[str, Any]:
         """Gold 대조 성공 후 영어 보고서를 한 번 생성해 기존 Silver 버킷에 저장한다."""
+
+        context = get_current_context()
+        if context["params"].get("enable_bedrock_report") is not True:
+            return {
+                "report_status": "SKIPPED",
+                "reason": "enable_bedrock_report is false",
+            }
 
         report_date = silver_result["received_date"]
         report = generate_report_from_athena(
