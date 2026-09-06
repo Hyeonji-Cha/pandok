@@ -176,13 +176,18 @@ def pandok_bronze_to_gold() -> None:
 
     @task
     def create_gold_views(silver_result: dict[str, Any]) -> dict[str, Any]:
-        """갱신된 Silver를 사용해 분석용 Gold View와 품질 검사 View를 다시 정의한다."""
+        """아이템 기준표를 적용하고 분석용 Gold View와 품질 검사 View를 다시 정의한다."""
 
         hook = SnowflakeHook(snowflake_conn_id=SNOWFLAKE_CONNECTION_ID)
-        hook.run(
-            _read_sql("snowflake/create_gold_views.sql"),
-            split_statements=True,
-        )
+        # 기준 테이블을 먼저 갱신해야 Gold 품질 검사가 등록되지 않은 item_id를 탐지할 수 있다.
+        for sql_name in (
+            "snowflake/create_item_catalog.sql",
+            "snowflake/create_gold_views.sql",
+        ):
+            hook.run(
+                _read_sql(sql_name),
+                split_statements=True,
+            )
         return silver_result
 
     @task

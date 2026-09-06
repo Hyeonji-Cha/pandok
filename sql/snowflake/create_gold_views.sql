@@ -501,6 +501,27 @@ WITH CHECK_RESULTS AS (
 
   UNION ALL
 
+  -- 새 게임 버전이나 아이템이 기준표 없이 분석되는 것을 적재 전에 차단한다.
+  SELECT
+    'item_catalog_coverage',
+    COUNT(*)
+  FROM (
+    SELECT DISTINCT
+      game_version,
+      TRY_PARSE_JSON(event_payload_json):choice_source::STRING AS choice_source,
+      TRY_PARSE_JSON(event_payload_json):selected_item_id::STRING AS item_id
+    FROM PANDOK.SILVER.SILVER_EVENTS
+    WHERE source_type = 'CONSENTED_PROD_PLAY'
+      AND event_name = 'upgrade_selected'
+  ) AS selected_items
+  LEFT JOIN ITEM_CATALOG AS catalog
+    ON selected_items.game_version = catalog.game_version
+    AND selected_items.choice_source = catalog.choice_source
+    AND selected_items.item_id = catalog.item_id
+  WHERE catalog.item_id IS NULL
+
+  UNION ALL
+
   SELECT
     'upgrade_funnel_ranges',
     COUNT(*)
