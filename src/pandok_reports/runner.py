@@ -60,13 +60,16 @@ _SECTION_QUERIES = {
         ORDER BY step_dropoff_percentage DESC, game_version, checkpoint_number
         LIMIT 20
     """,
-    "upgrade_post_selection": """
-        SELECT game_version, choice_source, item_id, rarity, selection_minute,
+    "item_performance_summary": """
+        SELECT game_version, choice_source, item_id, display_name,
+               item_category, intended_effect, primary_metric,
+               rarity_scaled, metric_readiness,
                selection_count, selected_run_count, outcome_observed_run_count,
                average_seconds_after_selection,
                death_within_60_seconds_count,
-               death_within_60_seconds_percentage, analysis_status
-        FROM gold_upgrade_post_selection
+               death_within_60_seconds_percentage,
+               average_final_level, average_total_kills, analysis_status
+        FROM gold_item_performance_summary
         WHERE outcome_observed_run_count > 0
         ORDER BY
           CASE analysis_status WHEN 'DESCRIPTIVE_ONLY' THEN 0 ELSE 1 END,
@@ -215,7 +218,7 @@ def generate_report_from_athena(
         checkpoint_metrics=sections["checkpoint_metrics"],
         upgrade_funnel=sections["upgrade_funnel"],
         run_progression=sections["run_progression"],
-        upgrade_post_selection=sections["upgrade_post_selection"],
+        item_performance_summary=sections["item_performance_summary"],
     )
     return generate_gold_report(report_input, bedrock_client=bedrock_client)
 

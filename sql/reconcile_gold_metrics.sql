@@ -27,11 +27,11 @@ FROM __TABLE_PREFIX__gold_run_progression
 UNION ALL
 
 SELECT
-  'upgrade_post_selection' AS dataset_key,
+  'item_performance_summary' AS dataset_key,
   COUNT(*) AS row_count,
   COALESCE(SUM(selection_count), 0) AS metric_1_count,
   COALESCE(SUM(selected_run_count), 0) AS metric_2_count,
   COALESCE(SUM(outcome_observed_run_count), 0) AS metric_3_count,
   COALESCE(SUM(death_within_60_seconds_count), 0) AS metric_4_count,
   COUNT_IF(analysis_status = 'INSUFFICIENT_SAMPLE') AS metric_5_count
-FROM __TABLE_PREFIX__gold_upgrade_post_selection;
+FROM __TABLE_PREFIX__gold_item_performance_summary;

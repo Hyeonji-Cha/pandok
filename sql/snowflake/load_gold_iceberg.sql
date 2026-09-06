@@ -246,6 +246,55 @@ SELECT
   analysis_status
 FROM PANDOK.GOLD.PRODUCT_UPGRADE_POST_SELECTION;
 
+-- 희귀도와 선택 시점을 합친 아이템 단위 기본 성과 지표를 분석 엔진에 공유한다.
+CREATE ICEBERG TABLE IF NOT EXISTS gold_item_performance_summary (
+  game_version STRING,
+  choice_source STRING,
+  item_id STRING,
+  display_name STRING,
+  item_category STRING,
+  intended_effect STRING,
+  primary_metric STRING,
+  rarity_scaled BOOLEAN,
+  metric_readiness STRING,
+  selection_count NUMBER(38, 0),
+  selected_run_count NUMBER(38, 0),
+  outcome_observed_run_count NUMBER(38, 0),
+  average_seconds_after_selection NUMBER(38, 2),
+  death_within_60_seconds_count NUMBER(38, 0),
+  death_within_60_seconds_percentage NUMBER(38, 2),
+  average_final_level NUMBER(38, 2),
+  average_total_kills NUMBER(38, 2),
+  analysis_status STRING
+)
+  BASE_LOCATION = 'gold/item_performance_summary/'
+  TARGET_FILE_SIZE = '16MB'
+  ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED';
+
+DELETE FROM gold_item_performance_summary;
+
+INSERT INTO gold_item_performance_summary
+SELECT
+  game_version,
+  choice_source,
+  item_id,
+  display_name,
+  item_category,
+  intended_effect,
+  primary_metric,
+  rarity_scaled,
+  metric_readiness,
+  selection_count,
+  selected_run_count,
+  outcome_observed_run_count,
+  average_seconds_after_selection,
+  death_within_60_seconds_count,
+  death_within_60_seconds_percentage,
+  average_final_level,
+  average_total_kills,
+  analysis_status
+FROM PANDOK.GOLD.PRODUCT_ITEM_PERFORMANCE_SUMMARY;
+
 -- 실제 플레이의 업그레이드 노출·선택·선택률을 보존한다.
 CREATE ICEBERG TABLE IF NOT EXISTS gold_upgrade_funnel (
   choice_source STRING,

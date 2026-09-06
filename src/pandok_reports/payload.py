@@ -55,18 +55,24 @@ _SECTION_COLUMNS = {
         "reach_percentage",
         "step_dropoff_percentage",
     ),
-    "upgrade_post_selection": (
+    "item_performance_summary": (
         "game_version",
         "choice_source",
         "item_id",
-        "rarity",
-        "selection_minute",
+        "display_name",
+        "item_category",
+        "intended_effect",
+        "primary_metric",
+        "rarity_scaled",
+        "metric_readiness",
         "selection_count",
         "selected_run_count",
         "outcome_observed_run_count",
         "average_seconds_after_selection",
         "death_within_60_seconds_count",
         "death_within_60_seconds_percentage",
+        "average_final_level",
+        "average_total_kills",
         "analysis_status",
     ),
 }
@@ -78,7 +84,7 @@ _SECTION_ROW_LIMITS = {
     "upgrade_funnel": 100,
     # 보고서에는 이탈이 큰 구간과 대표 업그레이드만 전달해 입력 토큰을 제한한다.
     "run_progression": 20,
-    "upgrade_post_selection": 20,
+    "item_performance_summary": 20,
 }
 
 
@@ -86,10 +92,14 @@ class GoldReportInputError(ValueError):
     """Gold 보고서 입력에 허용되지 않은 컬럼·값·크기가 있음을 나타낸다."""
 
 
-def _json_value(value: Any, *, section: str, column: str) -> str | int | float:
+def _json_value(value: Any, *, section: str, column: str) -> str | int | float | bool:
     """Snowflake 숫자 타입을 JSON 값으로 바꾸고 비정상 값과 긴 문자열을 차단한다."""
 
-    if isinstance(value, bool) or value is None:
+    if value is None:
+        raise GoldReportInputError(f"{section}.{column} 값이 올바르지 않습니다.")
+    if isinstance(value, bool):
+        if column == "rarity_scaled":
+            return value
         raise GoldReportInputError(f"{section}.{column} 값이 올바르지 않습니다.")
     if isinstance(value, Decimal):
         value = int(value) if value == value.to_integral_value() else float(value)
@@ -107,11 +117,11 @@ def _json_value(value: Any, *, section: str, column: str) -> str | int | float:
 def _normalize_section(
     section: str,
     source_rows: Iterable[Mapping[str, Any]],
-) -> list[dict[str, str | int | float]]:
+) -> list[dict[str, str | int | float | bool]]:
     """섹션별 허용 컬럼만 정확히 받도록 검사해 식별자나 원본 데이터 혼입을 막는다."""
 
     expected_columns = _SECTION_COLUMNS[section]
-    normalized_rows: list[dict[str, str | int | float]] = []
+    normalized_rows: list[dict[str, str | int | float | bool]] = []
 
     for source_row in source_rows:
         row = {str(column).lower(): value for column, value in source_row.items()}
@@ -151,7 +161,7 @@ def build_gold_report_input(
     checkpoint_metrics: Iterable[Mapping[str, Any]],
     upgrade_funnel: Iterable[Mapping[str, Any]],
     run_progression: Iterable[Mapping[str, Any]],
-    upgrade_post_selection: Iterable[Mapping[str, Any]],
+    item_performance_summary: Iterable[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """허용된 여섯 종류의 Gold 집계만 크기 제한이 있는 Bedrock 입력으로 만든다."""
 
@@ -177,9 +187,9 @@ def build_gold_report_input(
                 "run_progression",
                 run_progression,
             ),
-            "upgrade_post_selection": _normalize_section(
-                "upgrade_post_selection",
-                upgrade_post_selection,
+            "item_performance_summary": _normalize_section(
+                "item_performance_summary",
+                item_performance_summary,
             ),
         },
     }
@@ -215,5 +225,5 @@ def validate_gold_report_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         checkpoint_metrics=metrics["checkpoint_metrics"],
         upgrade_funnel=metrics["upgrade_funnel"],
         run_progression=metrics["run_progression"],
-        upgrade_post_selection=metrics["upgrade_post_selection"],
+        item_performance_summary=metrics["item_performance_summary"],
     )

@@ -33,7 +33,7 @@ def _report_input():
         checkpoint_metrics=[],
         upgrade_funnel=[],
         run_progression=[],
-        upgrade_post_selection=[],
+        item_performance_summary=[],
     )
 
 

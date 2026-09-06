@@ -337,7 +337,7 @@ SELECT
   ROUND(AVG(IFF(is_ended, final_level, NULL)), 2) AS average_final_level,
   ROUND(AVG(IFF(is_ended, total_kills, NULL)), 2) AS average_total_kills,
   IFF(
-    COUNT(*) < 30,
+    COUNT_IF(is_ended) < 30,
     'INSUFFICIENT_SAMPLE',
     'DESCRIPTIVE_ONLY'
   ) AS analysis_status
@@ -348,6 +348,70 @@ GROUP BY
   item_id,
   rarity,
   selection_minute;
+
+-- 세부 희귀도와 선택 시점 조합을 아이템 단위로 합쳐 표본 분산을 줄인다.
+-- 상세 View는 원인 탐색용으로 유지하고 이 View를 기본 성과 비교 단위로 사용한다.
+CREATE OR REPLACE VIEW PRODUCT_ITEM_PERFORMANCE_SUMMARY AS
+SELECT
+  detail.game_version,
+  detail.choice_source,
+  detail.item_id,
+  catalog.display_name,
+  catalog.item_category,
+  catalog.intended_effect,
+  catalog.primary_metric,
+  catalog.rarity_scaled,
+  catalog.metric_readiness,
+  SUM(detail.selection_count) AS selection_count,
+  SUM(detail.selected_run_count) AS selected_run_count,
+  SUM(detail.outcome_observed_run_count) AS outcome_observed_run_count,
+  ROUND(
+    SUM(
+      COALESCE(detail.average_seconds_after_selection, 0)
+      * detail.outcome_observed_run_count
+    ) / NULLIF(SUM(detail.outcome_observed_run_count), 0),
+    2
+  ) AS average_seconds_after_selection,
+  SUM(detail.death_within_60_seconds_count) AS death_within_60_seconds_count,
+  ROUND(
+    100.0 * SUM(detail.death_within_60_seconds_count)
+      / NULLIF(SUM(detail.outcome_observed_run_count), 0),
+    2
+  ) AS death_within_60_seconds_percentage,
+  ROUND(
+    SUM(
+      COALESCE(detail.average_final_level, 0)
+      * detail.outcome_observed_run_count
+    ) / NULLIF(SUM(detail.outcome_observed_run_count), 0),
+    2
+  ) AS average_final_level,
+  ROUND(
+    SUM(
+      COALESCE(detail.average_total_kills, 0)
+      * detail.outcome_observed_run_count
+    ) / NULLIF(SUM(detail.outcome_observed_run_count), 0),
+    2
+  ) AS average_total_kills,
+  IFF(
+    SUM(detail.outcome_observed_run_count) < 30,
+    'INSUFFICIENT_SAMPLE',
+    'DESCRIPTIVE_ONLY'
+  ) AS analysis_status
+FROM PRODUCT_UPGRADE_POST_SELECTION AS detail
+LEFT JOIN ITEM_CATALOG AS catalog
+  ON detail.game_version = catalog.game_version
+  AND detail.choice_source = catalog.choice_source
+  AND detail.item_id = catalog.item_id
+GROUP BY
+  detail.game_version,
+  detail.choice_source,
+  detail.item_id,
+  catalog.display_name,
+  catalog.item_category,
+  catalog.intended_effect,
+  catalog.primary_metric,
+  catalog.rarity_scaled,
+  catalog.metric_readiness;
 
 -- 노출 선택지를 행으로 펼친 뒤 실제 선택과 연결해 아이템 선택률을 계산한다.
 CREATE OR REPLACE VIEW PRODUCT_UPGRADE_FUNNEL AS
@@ -496,8 +560,35 @@ WITH CHECK_RESULTS AS (
      OR average_final_level < 0
      OR average_total_kills < 0
      OR analysis_status NOT IN ('INSUFFICIENT_SAMPLE', 'DESCRIPTIVE_ONLY')
-     OR (selected_run_count < 30 AND analysis_status <> 'INSUFFICIENT_SAMPLE')
-     OR (selected_run_count >= 30 AND analysis_status <> 'DESCRIPTIVE_ONLY')
+     OR (outcome_observed_run_count < 30 AND analysis_status <> 'INSUFFICIENT_SAMPLE')
+     OR (outcome_observed_run_count >= 30 AND analysis_status <> 'DESCRIPTIVE_ONLY')
+
+  UNION ALL
+
+  SELECT
+    'item_performance_summary_ranges',
+    COUNT(*)
+  FROM PRODUCT_ITEM_PERFORMANCE_SUMMARY
+  WHERE display_name IS NULL
+     OR item_category IS NULL
+     OR intended_effect IS NULL
+     OR primary_metric IS NULL
+     OR metric_readiness IS NULL
+     OR selection_count < 1
+     OR selected_run_count < 1
+     OR selected_run_count > selection_count
+     OR outcome_observed_run_count < 0
+     OR outcome_observed_run_count > selected_run_count
+     OR death_within_60_seconds_count < 0
+     OR death_within_60_seconds_count > outcome_observed_run_count
+     OR death_within_60_seconds_percentage < 0
+     OR death_within_60_seconds_percentage > 100
+     OR average_seconds_after_selection < 0
+     OR average_final_level < 0
+     OR average_total_kills < 0
+     OR analysis_status NOT IN ('INSUFFICIENT_SAMPLE', 'DESCRIPTIVE_ONLY')
+     OR (outcome_observed_run_count < 30 AND analysis_status <> 'INSUFFICIENT_SAMPLE')
+     OR (outcome_observed_run_count >= 30 AND analysis_status <> 'DESCRIPTIVE_ONLY')
 
   UNION ALL
 

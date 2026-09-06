@@ -18,7 +18,7 @@
         "checkpoint_metrics",
         "upgrade_funnel",
         "run_progression",
-        "upgrade_post_selection"
+        "item_performance_summary"
       ],
       "properties": {
         "run_quality": {
@@ -46,10 +46,10 @@
           "maxItems": 20,
           "items": {"$ref": "#/$defs/runProgression"}
         },
-        "upgrade_post_selection": {
+        "item_performance_summary": {
           "type": "array",
           "maxItems": 20,
-          "items": {"$ref": "#/$defs/upgradePostSelection"}
+          "items": {"$ref": "#/$defs/itemPerformanceSummary"}
         }
       }
     }
@@ -159,35 +159,47 @@
         "step_dropoff_percentage": {"$ref": "#/$defs/percentage"}
       }
     },
-    "upgradePostSelection": {
+    "itemPerformanceSummary": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "game_version",
         "choice_source",
         "item_id",
-        "rarity",
-        "selection_minute",
+        "display_name",
+        "item_category",
+        "intended_effect",
+        "primary_metric",
+        "rarity_scaled",
+        "metric_readiness",
         "selection_count",
         "selected_run_count",
         "outcome_observed_run_count",
         "average_seconds_after_selection",
         "death_within_60_seconds_count",
         "death_within_60_seconds_percentage",
+        "average_final_level",
+        "average_total_kills",
         "analysis_status"
       ],
       "properties": {
         "game_version": {"$ref": "#/$defs/shortLabel"},
         "choice_source": {"$ref": "#/$defs/shortLabel"},
         "item_id": {"$ref": "#/$defs/shortLabel"},
-        "rarity": {"$ref": "#/$defs/shortLabel"},
-        "selection_minute": {"$ref": "#/$defs/nonNegativeInteger"},
+        "display_name": {"$ref": "#/$defs/shortLabel"},
+        "item_category": {"$ref": "#/$defs/shortLabel"},
+        "intended_effect": {"$ref": "#/$defs/shortLabel"},
+        "primary_metric": {"$ref": "#/$defs/shortLabel"},
+        "rarity_scaled": {"type": "boolean"},
+        "metric_readiness": {"$ref": "#/$defs/shortLabel"},
         "selection_count": {"$ref": "#/$defs/nonNegativeInteger"},
         "selected_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
         "outcome_observed_run_count": {"$ref": "#/$defs/nonNegativeInteger"},
         "average_seconds_after_selection": {"$ref": "#/$defs/nonNegativeNumber"},
         "death_within_60_seconds_count": {"$ref": "#/$defs/nonNegativeInteger"},
         "death_within_60_seconds_percentage": {"$ref": "#/$defs/percentage"},
+        "average_final_level": {"$ref": "#/$defs/nonNegativeNumber"},
+        "average_total_kills": {"$ref": "#/$defs/nonNegativeNumber"},
         "analysis_status": {"enum": ["INSUFFICIENT_SAMPLE", "DESCRIPTIVE_ONLY"]}
       }
     }

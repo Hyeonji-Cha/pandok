@@ -78,7 +78,7 @@ def test_matches_multiple_gold_dataset_summaries():
                 "METRIC_2_COUNT": 20,
             },
             {
-                "DATASET_KEY": "upgrade_post_selection",
+                "DATASET_KEY": "item_performance_summary",
                 "ROW_COUNT": 113,
                 "METRIC_1_COUNT": 200,
                 "METRIC_2_COUNT": 150,
@@ -86,7 +86,7 @@ def test_matches_multiple_gold_dataset_summaries():
         ],
         [
             {
-                "dataset_key": "upgrade_post_selection",
+                "dataset_key": "item_performance_summary",
                 "row_count": "113",
                 "metric_1_count": "200",
                 "metric_2_count": "150",

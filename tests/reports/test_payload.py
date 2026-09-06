@@ -43,19 +43,25 @@ def _valid_sections():
                 "STEP_DROPOFF_PERCENTAGE": Decimal("20.83"),
             }
         ],
-        "upgrade_post_selection": [
+        "item_performance_summary": [
             {
                 "GAME_VERSION": "0.1.0",
                 "CHOICE_SOURCE": "level_up_weapon",
                 "ITEM_ID": "sword",
-                "RARITY": "common",
-                "SELECTION_MINUTE": Decimal("1"),
+                "DISPLAY_NAME": "Sword",
+                "ITEM_CATEGORY": "weapon_upgrade",
+                "INTENDED_EFFECT": "Increases weapon damage",
+                "PRIMARY_METRIC": "average_total_kills",
+                "RARITY_SCALED": True,
+                "METRIC_READINESS": "LIMITED_BY_CHECKPOINT_CADENCE",
                 "SELECTION_COUNT": Decimal("4"),
                 "SELECTED_RUN_COUNT": Decimal("3"),
                 "OUTCOME_OBSERVED_RUN_COUNT": Decimal("3"),
                 "AVERAGE_SECONDS_AFTER_SELECTION": Decimal("120.5"),
                 "DEATH_WITHIN_60_SECONDS_COUNT": Decimal("1"),
                 "DEATH_WITHIN_60_SECONDS_PERCENTAGE": Decimal("33.33"),
+                "AVERAGE_FINAL_LEVEL": Decimal("8.5"),
+                "AVERAGE_TOTAL_KILLS": Decimal("125.0"),
                 "ANALYSIS_STATUS": "INSUFFICIENT_SAMPLE",
             }
         ],
@@ -69,7 +75,7 @@ def test_builds_bounded_payload_from_aggregate_gold_rows():
     assert payload["metrics"]["run_outcomes"][0]["average_run_seconds"] == 655.18
     assert payload["metrics"]["run_progression"][0]["started_run_count"] == 27
     assert (
-        payload["metrics"]["upgrade_post_selection"][0]["analysis_status"]
+        payload["metrics"]["item_performance_summary"][0]["analysis_status"]
         == "INSUFFICIENT_SAMPLE"
     )
 
