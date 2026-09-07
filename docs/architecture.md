@@ -42,11 +42,20 @@ CONSENTED_PROD_PLAY
  Snowflake result <-> Athena result reconciliation
       |
  validated aggregate Gold metrics only
+       /                         \
+      v                           v
+ Snowflake Semantic View    Optional Bedrock Nova Micro
+ + Verified Queries         -> S3 English Markdown report
       |
- Bedrock Nova Micro -> S3 English Markdown report
+ Cortex Agent + Analyst
+ natural-language query
       |
  Developer review
 ```
+
+The Snowflake Agent configuration is implemented, but live inference is currently
+`IMPLEMENTED_BUT_RUNTIME_BLOCKED_BY_TRIAL`. The self-service trial account rejects Agent Preview requests;
+the Semantic View, Verified Queries and Agent tool specification remain independently inspectable.
 
 ## Ownership
 
@@ -62,9 +71,12 @@ CONSENTED_PROD_PLAY
 | Quarantine | Invalid or conflicting Runs with reasons |
 | Glue Data Catalog | Authoritative Silver and Gold Iceberg metadata |
 | Snowflake | Silver analytics and Gold Iceberg transformation |
+| Snowflake Semantic View | Governed meaning for Run, weapon, option, kill, survival, and version metrics |
+| Cortex Analyst Agent | Natural-language SQL over the Semantic View; configured, with trial runtime blocked |
+| Verified Queries | Human-reviewed question-to-SQL examples for three developer questions |
 | Athena | Independent query and Gold metric reconciliation |
 | Local Airflow | Manual date-scoped ordering and quality gates; retries are disabled |
-| Bedrock Nova Micro | One English report from approved aggregate metrics per DAG run |
+| Bedrock Nova Micro | Optional English report from approved aggregate metrics; disabled by default |
 | S3 AI report | Date-partitioned Markdown output; the same date is overwritten |
 
 ## Analytics layers
@@ -105,10 +117,14 @@ Athena is the independent validation engine. It reads the same Glue-cataloged Go
 defined core metrics after important transformations or releases, rather than duplicating every exploratory
 Snowflake query. This separation gives Snowflake the analysis role and Athena the reproducibility role.
 
-The same boundary supports a future natural-language analytics interface. Bedrock can translate a developer's
-question into an allow-listed metric and filter specification, while a deterministic query layer executes the
-aggregation against trusted Gold data. Bedrock explains the returned result; it does not calculate or invent
-the metric itself.
+The natural-language analysis interface is modeled in Snowflake rather than Bedrock. The
+`PANDOK_GAME_ANALYTICS` Semantic View limits questions to governed Gold dimensions and metrics, while three
+Verified Queries provide reviewed SQL examples for weapon popularity, starting-weapon kill performance, and
+option-associated survival. `PANDOK_GAME_ANALYST` is configured to use Cortex Analyst against that view with a
+30-second query timeout and 4,000-token orchestration budget. Live Agent inference remains unverified because
+the self-service trial account denies Agent execution. A restricted demonstration therefore runs the same
+Verified Query SQL directly and labels the runtime limitation. Bedrock remains a separate, optional fixed-report
+path and is disabled by default.
 
 ## Future analytical validation and experiments
 
@@ -135,7 +151,9 @@ current v2 contract and must not be added to production events without a contrac
 9. Query the same Gold table from Athena.
 10. Automatically compare core metrics between both engines.
 11. Let Airflow run transformation and validation in sequence.
-12. Send only validated Gold metrics to Bedrock.
+12. Optionally send only validated Gold metrics to Bedrock when explicitly enabled.
+13. Define governed Gold semantics and Verified Queries in Snowflake.
+14. Connect Cortex Analyst to the Semantic View with explicit time and token limits.
 
 All twelve steps were exercised successfully on 2026-09-04. This is an end-to-end implementation result,
 not proof that the metrics are statistically representative; the real-game verification sample contains
@@ -148,6 +166,8 @@ one Run.
 - Product Gold filters to `CONSENTED_PROD_PLAY`.
 - Snowflake and Athena compare compact count summaries for Run quality, progression, and post-selection Gold.
 - Bedrock is blocked when Snowflake/Athena reconciliation or Gold quality checks fail.
+- Cortex Analyst is restricted to the Semantic View rather than raw Silver or Bronze records.
+- Verified Queries retain game version, denominators, sample state, and non-causal wording where applicable.
 - AI output is advisory and never the source of record.
 
 ## Cost and shutdown boundary
@@ -156,4 +176,5 @@ one Run.
 - Local Airflow has `schedule=None`, zero task retries, and at most one active DAG run.
 - Kinesis and Firehose are controlled by `enable_streaming` and are disabled outside game tests.
 - S3 data has lifecycle limits, Athena uses the project workgroup, and Bedrock input/output sizes are capped.
+- Bedrock is off by default; Cortex Agent execution is currently blocked by the trial account and incurs no runtime usage.
 - API Gateway and Lambda stay deployed so the public endpoint remains unchanged.

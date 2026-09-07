@@ -49,11 +49,28 @@ AWS Bedrock 보고서는 삭제하지 않고 선택 기능으로 유지한다.
 - 반복 사용되고 계산 규칙이 확정된 지표만 공식 Gold로 승격한다.
 - AI 사용 자체가 목적이 아니라 사용자 요구와 비용에 따라 서로 다른 역할을 부여한 구조가 된다.
 
+## 2026-09-07 구현 및 검증 상태
+
+전체 상태는 `IMPLEMENTED_BUT_RUNTIME_BLOCKED_BY_TRIAL`이다.
+
+- `PANDOK.GOLD.PANDOK_GAME_ANALYTICS` Semantic View 생성과 Snowflake 등록을 확인했다.
+- Run, 무기 인기, 시작 무기 성과와 옵션 선택 결과를 Semantic View의 dimension, fact 및 metric으로 정의했다.
+- 개발자의 대표 질문 3개와 사람이 검토한 SQL을 `AI_VERIFIED_QUERIES`로 등록했다.
+- `PANDOK.GOLD.PANDOK_GAME_ANALYST` Agent를 생성하고 `cortex_analyst_text_to_sql` 도구, Semantic View,
+  `PANDOK_WH`, 30초 제한과 4,000-token 예산을 연결했다.
+- `DESCRIBE AGENT`와 `DESCRIBE SEMANTIC VIEW`로 위 구성을 확인했다.
+- Agent Preview의 실제 inference는 Snowflake self-service trial 계정에서 `Access denied for trial accounts`
+  오류로 차단되었다. 이는 SQL, Semantic View 또는 Agent specification 실패가 아니다.
+- 실행 성공 화면을 모방하지 않는다. 제한 데모에서는 자연어 질문, 대응 Verified Query와 동일 SQL의
+  실제 Gold 결과를 함께 보여주고 trial 제한을 명시한다.
+- 유료 계정 또는 Agent 실행이 허용된 계정이 준비되면 코드를 변경하지 않고 Preview 질문부터 다시
+  검증한다.
+
 ## 후속 작업
 
-1. PANDOK Semantic View를 구현한다.
-2. 개발자 대표 질문과 검증 SQL을 등록한다.
-3. 읽기 전용 Cortex 권한과 사용량 제한을 설정한다.
-4. Streamlit에 자연어 질문, 생성 SQL, 결과와 표본 경고 화면을 추가한다.
-5. 구현과 검증이 끝난 뒤 `architecture.md`, 운영 절차 및 최종 발표 문서에 실제 구현 상태와 결정 근거를 반영한다.
-
+1. ~~PANDOK Semantic View를 구현한다.~~ 완료
+2. ~~개발자 대표 질문과 검증 SQL을 등록한다.~~ 완료
+3. ~~Cortex Agent에 Semantic View와 사용량 제한을 연결한다.~~ 완료
+4. Agent 사용이 허용된 계정에서 실제 자연어 질의와 생성 SQL을 검증한다. Trial 계정 제한으로 보류
+5. 실제 inference가 검증된 뒤 Streamlit에 자연어 질문, 생성 SQL, 결과와 표본 경고 화면을 추가한다.
+6. 운영 절차와 최종 발표 문서에 실제 구현 상태와 결정 근거를 반영한다.

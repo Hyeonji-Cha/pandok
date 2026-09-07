@@ -16,10 +16,12 @@ retry-prone events into trusted Run analytics, and provide traceable improvement
 - Snowflake transformations that create Gold Iceberg tables in S3
 - Athena queries against the same Gold tables and automatic metric comparison
 - Local Airflow manual orchestration, quality checks, and date-scoped backfills
-- One English Bedrock report per successful DAG run, using validated Gold metrics only
+- Optional English Bedrock report from validated Gold metrics, disabled by default
 - At least one consented Steam beta Run traced end to end
 - One-row-per-Run Gold summary for reusable gameplay analysis
 - Descriptive checkpoint progression and post-selection upgrade metrics
+- Snowflake Semantic View and Verified Queries for governed natural-language analytics
+- Cortex Analyst Agent configuration with explicit time and token limits
 
 ## Data sources
 
@@ -44,6 +46,7 @@ producer is authorized to use the supplied value.
 - Autonomous game changes based on AI output
 - Claiming that an observed upgrade association proves a causal balance effect
 - Randomized A/B assignment in the current Unity build and v2 event contract
+- Claiming live Cortex Agent inference while the self-service trial account blocks execution
 
 ## Analytics boundary
 
@@ -74,6 +77,8 @@ Compact Snowflake-Athena count reconciliation for both datasets is implemented a
 - Bronze, Silver, Quarantine, and Gold count differences are explainable.
 - Snowflake and Athena agree on defined Gold metrics.
 - Bedrock numbers are traceable to validated Gold metric IDs.
+- Semantic View metrics and Verified Query SQL are inspectable without invoking an AI model.
+- Cortex Agent configuration points only to the governed Semantic View and a bounded warehouse execution environment.
 - Terraform reproduces the core AWS infrastructure.
 - README and evidence documents are sufficient to understand and demonstrate the system.
 
@@ -84,6 +89,14 @@ AWS to Silver, Gold, cross-engine reconciliation, and an S3-stored Bedrock repor
 connectivity and transformation behavior only; one Run is not sufficient for gameplay conclusions.
 
 See [E2E validation evidence](e2e-validation-2026-09-04.md).
+
+## Natural-language analytics status
+
+`PANDOK_GAME_ANALYTICS`, its three Verified Queries, and the `PANDOK_GAME_ANALYST` Cortex Analyst tool
+configuration were created and inspected on 2026-09-07. Actual Agent Preview execution is
+`IMPLEMENTED_BUT_RUNTIME_BLOCKED_BY_TRIAL`: Snowflake returns `Access denied for trial accounts`. Until an
+eligible account is available, demonstrations use each natural-language question alongside its reviewed SQL
+and live Gold query result, without representing that output as an Agent response.
 
 ## Delivery method
 
