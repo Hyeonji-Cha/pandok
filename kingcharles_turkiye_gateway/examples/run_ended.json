@@ -1,0 +1,29 @@
+{
+  "event_id": "00000000-0000-4000-8000-000000000005",
+  "event_name": "run_ended",
+  "source_type": "CONTROLLED_SCENARIO",
+  "run_id": "11111111-1111-4111-8111-111111111111",
+  "event_sequence": 5,
+  "run_elapsed_seconds": 123.5,
+  "game_version": "1.2.3",
+  "schema_version": "2.0",
+  "end_reason": "player_quit",
+  "final_level": 4,
+  "total_kills": 57,
+  "total_xp_collected": 88.5,
+  "current_gold": 22.5,
+  "total_gold_collected": 50,
+  "hearts_collected": 2,
+  "total_healing_received": 17.5,
+  "magnets_collected": 1,
+  "miniboss_waves_reached": 1,
+  "miniboss_waves_cleared": 1,
+  "final_upgrades": [
+    {
+      "item_id": "fireball",
+      "acquisition_count": 1,
+      "effect_type": "damage",
+      "effect_value": 1.5
+    }
+  ]
+}
