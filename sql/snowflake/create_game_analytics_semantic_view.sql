@@ -210,6 +210,71 @@ CREATE OR REPLACE SEMANTIC VIEW PANDOK_GAME_ANALYTICS
 
   AI_QUESTION_CATEGORIZATION
     'Accept only questions about anonymous Runs, weapons, options, kill counts, survival time, game version, ending reasons, death causes, popularity, and sample status. If a question asks about players, identities, sessions, devices, locations, exact event times, unsupported game fields, predictions, or causal proof, explain that the semantic view does not support it.'
+
+  AI_VERIFIED_QUERIES (
+    most_frequently_first_selected_weapon AS (
+      QUESTION 'Which weapon is selected first most often?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT
+             weapon_popularity.game_version,
+             weapon_popularity.weapon_name,
+             AGG(weapon_popularity.first_selected_run_count)
+               AS first_selected_run_count,
+             AGG(weapon_popularity.exposure_count) AS exposure_count,
+             AGG(weapon_popularity.exposure_adjusted_selection_percentage)
+               AS exposure_adjusted_selection_percentage
+           FROM PANDOK.GOLD.PANDOK_GAME_ANALYTICS
+           GROUP BY
+             weapon_popularity.game_version,
+             weapon_popularity.weapon_name
+           ORDER BY first_selected_run_count DESC NULLS LAST
+           LIMIT 20'
+    ),
+
+    highest_average_kills_by_starting_weapon AS (
+      QUESTION 'Which starting weapon has the highest average kill count?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT
+             weapon_performance.game_version,
+             weapon_performance.weapon_name,
+             weapon_performance.sample_status,
+             AGG(weapon_performance.observed_run_count) AS observed_run_count,
+             AGG(weapon_performance.average_kill_count) AS average_kill_count,
+             AGG(weapon_performance.kills_per_minute) AS kills_per_minute
+           FROM PANDOK.GOLD.PANDOK_GAME_ANALYTICS
+           GROUP BY
+             weapon_performance.game_version,
+             weapon_performance.weapon_name,
+             weapon_performance.sample_status
+           ORDER BY average_kill_count DESC NULLS LAST
+           LIMIT 20'
+    ),
+
+    options_associated_with_longer_survival AS (
+      QUESTION 'Which options are associated with longer survival time?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT
+             option_outcomes.game_version,
+             option_outcomes.choice_source,
+             option_outcomes.item_name,
+             option_outcomes.item_category,
+             option_outcomes.sample_status,
+             AGG(option_outcomes.offered_run_count) AS offered_run_count,
+             AGG(option_outcomes.selected_run_count) AS selected_run_count,
+             AGG(option_outcomes.not_selected_run_count) AS not_selected_run_count,
+             AGG(option_outcomes.average_survival_seconds_difference)
+               AS average_survival_seconds_difference
+           FROM PANDOK.GOLD.PANDOK_GAME_ANALYTICS
+           GROUP BY
+             option_outcomes.game_version,
+             option_outcomes.choice_source,
+             option_outcomes.item_name,
+             option_outcomes.item_category,
+             option_outcomes.sample_status
+           ORDER BY average_survival_seconds_difference DESC NULLS LAST
+           LIMIT 20'
+    )
+  )
 ;
 
 -- 생성 결과와 공개된 의미 표현을 사람이 확인하는 읽기 전용 검증 명령이다.
