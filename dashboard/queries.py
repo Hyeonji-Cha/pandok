@@ -60,6 +60,38 @@ def build_dashboard_queries(game_version: str | None = None) -> dict[str, str]:
             WHERE {version_filter}
             ORDER BY outcome_observed_run_count DESC, display_name
         """,
+        "weapon_popularity": f"""
+            SELECT game_version, weapon_id, display_name,
+                   starting_run_count, exposure_count, exposed_run_count,
+                   selection_count, selected_run_count,
+                   first_selected_run_count, selection_percentage
+            FROM gold_weapon_popularity
+            WHERE {version_filter}
+            ORDER BY first_selected_run_count DESC, selection_percentage DESC
+        """,
+        "weapon_performance": f"""
+            SELECT game_version, weapon_id, display_name, run_count,
+                   outcome_observed_run_count, average_run_seconds,
+                   average_total_kills, kills_per_minute,
+                   average_final_level, average_total_xp,
+                   average_total_gold, death_percentage, analysis_status
+            FROM gold_weapon_performance
+            WHERE {version_filter}
+            ORDER BY average_total_kills DESC, outcome_observed_run_count DESC
+        """,
+        "option_outcomes": f"""
+            SELECT game_version, choice_source, item_id, display_name,
+                   item_category, offered_run_count, selected_run_count,
+                   not_selected_run_count, selected_outcome_run_count,
+                   not_selected_outcome_run_count, selected_average_kills,
+                   not_selected_average_kills, average_kill_difference,
+                   selected_average_run_seconds,
+                   not_selected_average_run_seconds,
+                   average_run_seconds_difference, analysis_status
+            FROM gold_option_outcome_comparison
+            WHERE {version_filter}
+            ORDER BY average_kill_difference DESC, offered_run_count DESC
+        """,
         "run_quality": """
             SELECT run_status, run_count, input_event_count, unique_event_count,
                    exact_retry_count, conflicting_duplicate_count

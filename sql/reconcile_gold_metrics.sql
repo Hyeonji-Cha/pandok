@@ -34,4 +34,40 @@ SELECT
   COALESCE(SUM(outcome_observed_run_count), 0) AS metric_3_count,
   COALESCE(SUM(death_within_60_seconds_count), 0) AS metric_4_count,
   COUNT_IF(analysis_status = 'INSUFFICIENT_SAMPLE') AS metric_5_count
-FROM __TABLE_PREFIX__gold_item_performance_summary;
+FROM __TABLE_PREFIX__gold_item_performance_summary
+
+UNION ALL
+
+SELECT
+  'weapon_popularity' AS dataset_key,
+  COUNT(*) AS row_count,
+  COALESCE(SUM(starting_run_count), 0) AS metric_1_count,
+  COALESCE(SUM(exposure_count), 0) AS metric_2_count,
+  COALESCE(SUM(selection_count), 0) AS metric_3_count,
+  COALESCE(SUM(first_selected_run_count), 0) AS metric_4_count,
+  COUNT_IF(selection_percentage > 0) AS metric_5_count
+FROM __TABLE_PREFIX__gold_weapon_popularity
+
+UNION ALL
+
+SELECT
+  'weapon_performance' AS dataset_key,
+  COUNT(*) AS row_count,
+  COALESCE(SUM(run_count), 0) AS metric_1_count,
+  COALESCE(SUM(outcome_observed_run_count), 0) AS metric_2_count,
+  COALESCE(SUM(average_total_kills), 0) AS metric_3_count,
+  COUNT_IF(analysis_status = 'INSUFFICIENT_SAMPLE') AS metric_4_count,
+  COUNT_IF(death_percentage > 0) AS metric_5_count
+FROM __TABLE_PREFIX__gold_weapon_performance
+
+UNION ALL
+
+SELECT
+  'option_outcome_comparison' AS dataset_key,
+  COUNT(*) AS row_count,
+  COALESCE(SUM(offered_run_count), 0) AS metric_1_count,
+  COALESCE(SUM(selected_run_count), 0) AS metric_2_count,
+  COALESCE(SUM(not_selected_run_count), 0) AS metric_3_count,
+  COALESCE(SUM(selected_outcome_run_count), 0) AS metric_4_count,
+  COALESCE(SUM(not_selected_outcome_run_count), 0) AS metric_5_count
+FROM __TABLE_PREFIX__gold_option_outcome_comparison;

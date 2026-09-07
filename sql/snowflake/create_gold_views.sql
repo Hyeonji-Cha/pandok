@@ -413,6 +413,219 @@ GROUP BY
   catalog.rarity_scaled,
   catalog.metric_readiness;
 
+-- 무기가 실제로 제시된 기회를 분모로 사용해 시작·최초 선택·전체 선택 인기도를 비교한다.
+CREATE OR REPLACE VIEW PRODUCT_WEAPON_POPULARITY AS
+WITH WEAPONS AS (
+  SELECT game_version, item_id, display_name
+  FROM ITEM_CATALOG
+  WHERE item_category = 'weapon'
+),
+STARTING_WEAPONS AS (
+  SELECT game_version, starting_weapon_id AS item_id, COUNT(*) AS starting_run_count
+  FROM PRODUCT_RUN_SUMMARY
+  WHERE is_started AND starting_weapon_id IS NOT NULL
+  GROUP BY game_version, starting_weapon_id
+),
+SHOWN_WEAPONS AS (
+  SELECT
+    events.run_id,
+    events.game_version,
+    flattened.value:item_id::STRING AS item_id
+  FROM PANDOK.SILVER.SILVER_EVENTS AS events,
+  LATERAL FLATTEN(INPUT => TRY_PARSE_JSON(events.event_payload_json):options) AS flattened
+  WHERE events.source_type = 'CONSENTED_PROD_PLAY'
+    AND events.event_name = 'upgrade_options_shown'
+    AND TRY_PARSE_JSON(events.event_payload_json):choice_source::STRING = 'level_up_weapon'
+),
+WEAPON_SELECTIONS AS (
+  SELECT
+    run_id,
+    game_version,
+    event_sequence,
+    TRY_PARSE_JSON(event_payload_json):selected_item_id::STRING AS item_id,
+    ROW_NUMBER() OVER (
+      PARTITION BY run_id
+      ORDER BY event_sequence
+    ) AS weapon_selection_number
+  FROM PANDOK.SILVER.SILVER_EVENTS
+  WHERE source_type = 'CONSENTED_PROD_PLAY'
+    AND event_name = 'upgrade_selected'
+    AND TRY_PARSE_JSON(event_payload_json):choice_source::STRING = 'level_up_weapon'
+),
+EXPOSURE_COUNTS AS (
+  SELECT
+    game_version,
+    item_id,
+    COUNT(*) AS exposure_count,
+    COUNT(DISTINCT run_id) AS exposed_run_count
+  FROM SHOWN_WEAPONS
+  GROUP BY game_version, item_id
+),
+SELECTION_COUNTS AS (
+  SELECT
+    game_version,
+    item_id,
+    COUNT(*) AS selection_count,
+    COUNT(DISTINCT run_id) AS selected_run_count,
+    COUNT_IF(weapon_selection_number = 1) AS first_selected_run_count
+  FROM WEAPON_SELECTIONS
+  GROUP BY game_version, item_id
+)
+SELECT
+  weapons.game_version,
+  weapons.item_id AS weapon_id,
+  weapons.display_name,
+  COALESCE(starts.starting_run_count, 0) AS starting_run_count,
+  COALESCE(exposures.exposure_count, 0) AS exposure_count,
+  COALESCE(exposures.exposed_run_count, 0) AS exposed_run_count,
+  COALESCE(selections.selection_count, 0) AS selection_count,
+  COALESCE(selections.selected_run_count, 0) AS selected_run_count,
+  COALESCE(selections.first_selected_run_count, 0) AS first_selected_run_count,
+  ROUND(
+    100.0 * COALESCE(selections.selection_count, 0)
+      / NULLIF(exposures.exposure_count, 0),
+    2
+  ) AS selection_percentage
+FROM WEAPONS AS weapons
+LEFT JOIN STARTING_WEAPONS AS starts
+  ON weapons.game_version = starts.game_version
+  AND weapons.item_id = starts.item_id
+LEFT JOIN EXPOSURE_COUNTS AS exposures
+  ON weapons.game_version = exposures.game_version
+  AND weapons.item_id = exposures.item_id
+LEFT JOIN SELECTION_COUNTS AS selections
+  ON weapons.game_version = selections.game_version
+  AND weapons.item_id = selections.item_id;
+
+-- 시작 무기별 종료 성과를 집계해 킬 수와 생존시간의 관찰 차이를 비교한다.
+CREATE OR REPLACE VIEW PRODUCT_WEAPON_PERFORMANCE AS
+SELECT
+  runs.game_version,
+  runs.starting_weapon_id AS weapon_id,
+  catalog.display_name,
+  COUNT(*) AS run_count,
+  COUNT_IF(runs.is_ended) AS outcome_observed_run_count,
+  ROUND(AVG(IFF(runs.is_ended, runs.run_duration_seconds, NULL)), 2)
+    AS average_run_seconds,
+  ROUND(AVG(IFF(runs.is_ended, runs.total_kills, NULL)), 2)
+    AS average_total_kills,
+  ROUND(
+    60.0 * SUM(IFF(runs.is_ended, runs.total_kills, 0))
+      / NULLIF(SUM(IFF(runs.is_ended, runs.run_duration_seconds, 0)), 0),
+    2
+  ) AS kills_per_minute,
+  ROUND(AVG(IFF(runs.is_ended, runs.final_level, NULL)), 2)
+    AS average_final_level,
+  ROUND(AVG(IFF(runs.is_ended, runs.total_xp_collected, NULL)), 2)
+    AS average_total_xp,
+  ROUND(AVG(IFF(runs.is_ended, runs.total_gold_collected, NULL)), 2)
+    AS average_total_gold,
+  ROUND(
+    100.0 * COUNT_IF(runs.is_ended AND runs.end_reason = 'player_death')
+      / NULLIF(COUNT_IF(runs.is_ended), 0),
+    2
+  ) AS death_percentage,
+  IFF(
+    COUNT_IF(runs.is_ended) < 30,
+    'INSUFFICIENT_SAMPLE',
+    'DESCRIPTIVE_ONLY'
+  ) AS analysis_status
+FROM PRODUCT_RUN_SUMMARY AS runs
+LEFT JOIN ITEM_CATALOG AS catalog
+  ON runs.game_version = catalog.game_version
+  AND catalog.choice_source = 'level_up_weapon'
+  AND runs.starting_weapon_id = catalog.item_id
+WHERE runs.is_started
+  AND runs.starting_weapon_id IS NOT NULL
+GROUP BY runs.game_version, runs.starting_weapon_id, catalog.display_name;
+
+-- 같은 옵션을 실제로 제시받은 Run 안에서 선택 여부에 따른 킬 수와 생존시간을 비교한다.
+-- 무작위 실험이 아니므로 결과는 인과효과가 아니라 개발 판단을 위한 관찰 차이로 제한한다.
+CREATE OR REPLACE VIEW PRODUCT_OPTION_OUTCOME_COMPARISON AS
+WITH OFFERED_OPTIONS AS (
+  SELECT DISTINCT
+    events.run_id,
+    events.game_version,
+    TRY_PARSE_JSON(events.event_payload_json):choice_source::STRING AS choice_source,
+    flattened.value:item_id::STRING AS item_id
+  FROM PANDOK.SILVER.SILVER_EVENTS AS events,
+  LATERAL FLATTEN(INPUT => TRY_PARSE_JSON(events.event_payload_json):options) AS flattened
+  WHERE events.source_type = 'CONSENTED_PROD_PLAY'
+    AND events.event_name = 'upgrade_options_shown'
+),
+SELECTED_ITEMS AS (
+  SELECT DISTINCT
+    run_id,
+    TRY_PARSE_JSON(event_payload_json):choice_source::STRING AS choice_source,
+    TRY_PARSE_JSON(event_payload_json):selected_item_id::STRING AS item_id
+  FROM PANDOK.SILVER.SILVER_EVENTS
+  WHERE source_type = 'CONSENTED_PROD_PLAY'
+    AND event_name = 'upgrade_selected'
+),
+OBSERVATIONS AS (
+  SELECT
+    offered.game_version,
+    offered.choice_source,
+    offered.item_id,
+    selected.item_id IS NOT NULL AS was_selected,
+    runs.is_ended,
+    runs.run_duration_seconds,
+    runs.total_kills
+  FROM OFFERED_OPTIONS AS offered
+  INNER JOIN PRODUCT_RUN_SUMMARY AS runs
+    ON offered.run_id = runs.run_id
+  LEFT JOIN SELECTED_ITEMS AS selected
+    ON offered.run_id = selected.run_id
+    AND offered.choice_source = selected.choice_source
+    AND offered.item_id = selected.item_id
+)
+SELECT
+  observations.game_version,
+  observations.choice_source,
+  observations.item_id,
+  catalog.display_name,
+  catalog.item_category,
+  COUNT(*) AS offered_run_count,
+  COUNT_IF(was_selected) AS selected_run_count,
+  COUNT_IF(NOT was_selected) AS not_selected_run_count,
+  COUNT_IF(was_selected AND is_ended) AS selected_outcome_run_count,
+  COUNT_IF(NOT was_selected AND is_ended) AS not_selected_outcome_run_count,
+  ROUND(AVG(IFF(was_selected AND is_ended, total_kills, NULL)), 2)
+    AS selected_average_kills,
+  ROUND(AVG(IFF(NOT was_selected AND is_ended, total_kills, NULL)), 2)
+    AS not_selected_average_kills,
+  ROUND(
+    AVG(IFF(was_selected AND is_ended, total_kills, NULL))
+      - AVG(IFF(NOT was_selected AND is_ended, total_kills, NULL)),
+    2
+  ) AS average_kill_difference,
+  ROUND(AVG(IFF(was_selected AND is_ended, run_duration_seconds, NULL)), 2)
+    AS selected_average_run_seconds,
+  ROUND(AVG(IFF(NOT was_selected AND is_ended, run_duration_seconds, NULL)), 2)
+    AS not_selected_average_run_seconds,
+  ROUND(
+    AVG(IFF(was_selected AND is_ended, run_duration_seconds, NULL))
+      - AVG(IFF(NOT was_selected AND is_ended, run_duration_seconds, NULL)),
+    2
+  ) AS average_run_seconds_difference,
+  IFF(
+    COUNT_IF(was_selected AND is_ended) < 30
+      OR COUNT_IF(NOT was_selected AND is_ended) < 30,
+    'INSUFFICIENT_SAMPLE',
+    'DESCRIPTIVE_ONLY'
+  ) AS analysis_status
+FROM OBSERVATIONS AS observations
+LEFT JOIN ITEM_CATALOG AS catalog
+  ON observations.game_version = catalog.game_version
+  AND observations.choice_source = catalog.choice_source
+  AND observations.item_id = catalog.item_id
+GROUP BY
+  observations.game_version,
+  observations.choice_source,
+  observations.item_id,
+  catalog.display_name,
+  catalog.item_category;
+
 -- 노출 선택지를 행으로 펼친 뒤 실제 선택과 연결해 아이템 선택률을 계산한다.
 CREATE OR REPLACE VIEW PRODUCT_UPGRADE_FUNNEL AS
 WITH SHOWN_EVENTS AS (
@@ -589,6 +802,78 @@ WITH CHECK_RESULTS AS (
      OR analysis_status NOT IN ('INSUFFICIENT_SAMPLE', 'DESCRIPTIVE_ONLY')
      OR (outcome_observed_run_count < 30 AND analysis_status <> 'INSUFFICIENT_SAMPLE')
      OR (outcome_observed_run_count >= 30 AND analysis_status <> 'DESCRIPTIVE_ONLY')
+
+  UNION ALL
+
+  SELECT
+    'weapon_popularity_ranges',
+    COUNT(*)
+  FROM PRODUCT_WEAPON_POPULARITY
+  WHERE display_name IS NULL
+     OR starting_run_count < 0
+     OR exposure_count < 0
+     OR exposed_run_count < 0
+     OR selection_count < 0
+     OR selected_run_count < 0
+     OR first_selected_run_count < 0
+     OR exposed_run_count > exposure_count
+     OR selected_run_count > selection_count
+     OR first_selected_run_count > selected_run_count
+     OR selection_count > exposure_count
+     OR selection_percentage < 0
+     OR selection_percentage > 100
+
+  UNION ALL
+
+  SELECT
+    'weapon_performance_ranges',
+    COUNT(*)
+  FROM PRODUCT_WEAPON_PERFORMANCE
+  WHERE display_name IS NULL
+     OR run_count < 1
+     OR outcome_observed_run_count < 0
+     OR outcome_observed_run_count > run_count
+     OR average_run_seconds < 0
+     OR average_total_kills < 0
+     OR kills_per_minute < 0
+     OR average_final_level < 0
+     OR average_total_xp < 0
+     OR average_total_gold < 0
+     OR death_percentage < 0
+     OR death_percentage > 100
+     OR analysis_status NOT IN ('INSUFFICIENT_SAMPLE', 'DESCRIPTIVE_ONLY')
+     OR (outcome_observed_run_count < 30 AND analysis_status <> 'INSUFFICIENT_SAMPLE')
+     OR (outcome_observed_run_count >= 30 AND analysis_status <> 'DESCRIPTIVE_ONLY')
+
+  UNION ALL
+
+  SELECT
+    'option_outcome_comparison_ranges',
+    COUNT(*)
+  FROM PRODUCT_OPTION_OUTCOME_COMPARISON
+  WHERE display_name IS NULL
+     OR item_category IS NULL
+     OR offered_run_count < 1
+     OR selected_run_count < 0
+     OR not_selected_run_count < 0
+     OR selected_run_count + not_selected_run_count <> offered_run_count
+     OR selected_outcome_run_count < 0
+     OR selected_outcome_run_count > selected_run_count
+     OR not_selected_outcome_run_count < 0
+     OR not_selected_outcome_run_count > not_selected_run_count
+     OR selected_average_kills < 0
+     OR not_selected_average_kills < 0
+     OR selected_average_run_seconds < 0
+     OR not_selected_average_run_seconds < 0
+     OR analysis_status NOT IN ('INSUFFICIENT_SAMPLE', 'DESCRIPTIVE_ONLY')
+     OR (
+       (selected_outcome_run_count < 30 OR not_selected_outcome_run_count < 30)
+       AND analysis_status <> 'INSUFFICIENT_SAMPLE'
+     )
+     OR (
+       selected_outcome_run_count >= 30 AND not_selected_outcome_run_count >= 30
+       AND analysis_status <> 'DESCRIPTIVE_ONLY'
+     )
 
   UNION ALL
 

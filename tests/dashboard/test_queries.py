@@ -18,7 +18,10 @@ def test_builds_item_summary_query_with_version_filter():
 
     assert "gold_item_performance_summary" in result["item_performance"]
     assert "game_version = '0.1.0'" in result["item_performance"]
-    assert len(result) == 5
+    assert "gold_weapon_popularity" in result["weapon_popularity"]
+    assert "gold_weapon_performance" in result["weapon_performance"]
+    assert "gold_option_outcome_comparison" in result["option_outcomes"]
+    assert len(result) == 8
 
 
 def test_rejects_unsafe_game_version():

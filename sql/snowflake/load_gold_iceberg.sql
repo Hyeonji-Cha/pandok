@@ -295,6 +295,125 @@ SELECT
   analysis_status
 FROM PANDOK.GOLD.PRODUCT_ITEM_PERFORMANCE_SUMMARY;
 
+-- 무기별 시작·노출·최초 선택 인기도를 공유해 콘텐츠 유지와 개선 판단에 사용한다.
+CREATE ICEBERG TABLE IF NOT EXISTS gold_weapon_popularity (
+  game_version STRING,
+  weapon_id STRING,
+  display_name STRING,
+  starting_run_count NUMBER(38, 0),
+  exposure_count NUMBER(38, 0),
+  exposed_run_count NUMBER(38, 0),
+  selection_count NUMBER(38, 0),
+  selected_run_count NUMBER(38, 0),
+  first_selected_run_count NUMBER(38, 0),
+  selection_percentage NUMBER(38, 2)
+)
+  BASE_LOCATION = 'gold/weapon_popularity/'
+  TARGET_FILE_SIZE = '16MB'
+  ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED';
+
+DELETE FROM gold_weapon_popularity;
+
+INSERT INTO gold_weapon_popularity
+SELECT
+  game_version,
+  weapon_id,
+  display_name,
+  starting_run_count,
+  exposure_count,
+  exposed_run_count,
+  selection_count,
+  selected_run_count,
+  first_selected_run_count,
+  selection_percentage
+FROM PANDOK.GOLD.PRODUCT_WEAPON_POPULARITY;
+
+-- 시작 무기별 킬 수·분당 킬·생존시간을 공유해 무기 성과 차이를 비교한다.
+CREATE ICEBERG TABLE IF NOT EXISTS gold_weapon_performance (
+  game_version STRING,
+  weapon_id STRING,
+  display_name STRING,
+  run_count NUMBER(38, 0),
+  outcome_observed_run_count NUMBER(38, 0),
+  average_run_seconds NUMBER(38, 2),
+  average_total_kills NUMBER(38, 2),
+  kills_per_minute NUMBER(38, 2),
+  average_final_level NUMBER(38, 2),
+  average_total_xp NUMBER(38, 2),
+  average_total_gold NUMBER(38, 2),
+  death_percentage NUMBER(38, 2),
+  analysis_status STRING
+)
+  BASE_LOCATION = 'gold/weapon_performance/'
+  TARGET_FILE_SIZE = '16MB'
+  ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED';
+
+DELETE FROM gold_weapon_performance;
+
+INSERT INTO gold_weapon_performance
+SELECT
+  game_version,
+  weapon_id,
+  display_name,
+  run_count,
+  outcome_observed_run_count,
+  average_run_seconds,
+  average_total_kills,
+  kills_per_minute,
+  average_final_level,
+  average_total_xp,
+  average_total_gold,
+  death_percentage,
+  analysis_status
+FROM PANDOK.GOLD.PRODUCT_WEAPON_PERFORMANCE;
+
+-- 같은 옵션을 제시받은 선택·비선택 Run의 킬 수와 생존시간 차이를 공유한다.
+CREATE ICEBERG TABLE IF NOT EXISTS gold_option_outcome_comparison (
+  game_version STRING,
+  choice_source STRING,
+  item_id STRING,
+  display_name STRING,
+  item_category STRING,
+  offered_run_count NUMBER(38, 0),
+  selected_run_count NUMBER(38, 0),
+  not_selected_run_count NUMBER(38, 0),
+  selected_outcome_run_count NUMBER(38, 0),
+  not_selected_outcome_run_count NUMBER(38, 0),
+  selected_average_kills NUMBER(38, 2),
+  not_selected_average_kills NUMBER(38, 2),
+  average_kill_difference NUMBER(38, 2),
+  selected_average_run_seconds NUMBER(38, 2),
+  not_selected_average_run_seconds NUMBER(38, 2),
+  average_run_seconds_difference NUMBER(38, 2),
+  analysis_status STRING
+)
+  BASE_LOCATION = 'gold/option_outcome_comparison/'
+  TARGET_FILE_SIZE = '16MB'
+  ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED';
+
+DELETE FROM gold_option_outcome_comparison;
+
+INSERT INTO gold_option_outcome_comparison
+SELECT
+  game_version,
+  choice_source,
+  item_id,
+  display_name,
+  item_category,
+  offered_run_count,
+  selected_run_count,
+  not_selected_run_count,
+  selected_outcome_run_count,
+  not_selected_outcome_run_count,
+  selected_average_kills,
+  not_selected_average_kills,
+  average_kill_difference,
+  selected_average_run_seconds,
+  not_selected_average_run_seconds,
+  average_run_seconds_difference,
+  analysis_status
+FROM PANDOK.GOLD.PRODUCT_OPTION_OUTCOME_COMPARISON;
+
 -- 실제 플레이의 업그레이드 노출·선택·선택률을 보존한다.
 CREATE ICEBERG TABLE IF NOT EXISTS gold_upgrade_funnel (
   choice_source STRING,

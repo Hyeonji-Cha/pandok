@@ -63,5 +63,17 @@ st.subheader("Item performance summary")
 st.caption("INSUFFICIENT_SAMPLE means fewer than 30 ended Runs were observed for the item.")
 st.dataframe(data["item_performance"], width="stretch", hide_index=True)
 
+st.subheader("Weapon popularity")
+st.caption("Selection percentage uses weapon exposures as its denominator.")
+st.dataframe(data["weapon_popularity"], width="stretch", hide_index=True)
+
+st.subheader("Starting weapon performance")
+st.caption("Kill and survival differences are descriptive, not causal effects.")
+st.dataframe(data["weapon_performance"], width="stretch", hide_index=True)
+
+st.subheader("Selected vs not selected option outcomes")
+st.caption("Only Runs that were actually offered each option are compared.")
+st.dataframe(data["option_outcomes"], width="stretch", hide_index=True)
+
 st.subheader("Data quality")
 st.dataframe(data["run_quality"], width="stretch", hide_index=True)
