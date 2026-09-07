@@ -26,18 +26,32 @@ def build_dashboard_queries(game_version: str | None = None) -> dict[str, str]:
               COUNT(*) AS total_run_count,
               COUNT_IF(is_started) AS started_run_count,
               COUNT_IF(is_ended) AS ended_run_count,
-              COUNT_IF(NOT is_ended) AS incomplete_run_count
+              COUNT_IF(NOT is_ended) AS incomplete_run_count,
+              ROUND(AVG(run_duration_seconds), 2) AS average_run_seconds
             FROM gold_run_summary
             WHERE {version_filter}
         """,
         "run_endings": f"""
+            WITH NORMALIZED_ENDINGS AS (
+              SELECT
+                COALESCE(end_reason, 'incomplete') AS end_reason,
+                CASE
+                  WHEN end_reason = 'player_death' AND death_cause IS NULL
+                    THEN 'not_collected_legacy'
+                  WHEN end_reason = 'player_death'
+                    THEN death_cause
+                  ELSE 'not_applicable'
+                END AS death_cause,
+                run_duration_seconds
+              FROM gold_run_summary
+              WHERE {version_filter}
+            )
             SELECT
-              COALESCE(end_reason, 'incomplete') AS end_reason,
-              COALESCE(death_cause, 'not_applicable_or_unknown') AS death_cause,
+              end_reason,
+              death_cause,
               COUNT(*) AS run_count,
               ROUND(AVG(run_duration_seconds), 2) AS average_run_seconds
-            FROM gold_run_summary
-            WHERE {version_filter}
+            FROM NORMALIZED_ENDINGS
             GROUP BY end_reason, death_cause
             ORDER BY run_count DESC, end_reason, death_cause
         """,

@@ -21,6 +21,9 @@ def test_builds_item_summary_query_with_version_filter():
     assert "gold_weapon_popularity" in result["weapon_popularity"]
     assert "gold_weapon_performance" in result["weapon_performance"]
     assert "gold_option_outcome_comparison" in result["option_outcomes"]
+    assert "not_collected_legacy" in result["run_endings"]
+    assert "not_applicable" in result["run_endings"]
+    assert "AVG(run_duration_seconds)" in result["run_overview"]
     assert len(result) == 8
 
 
